@@ -91,8 +91,24 @@ class TestSampling(unittest.TestCase):
         )
 
     def test_draw_samples_from_sem(self):
+        # test 1: no intervention
         sem = StationaryModel()
         samples = draw_samples_from_sem(sem, 3, 3)
+        self.assertEqual(len(samples), 3)
+        self.assertEqual(samples["X"].shape, (3, 3))
+        self.assertEqual(samples["Z"].shape, (3, 3))
+        self.assertEqual(samples["Y"].shape, (3, 3))
+        self.assertIsInstance(samples["X"], tf.Tensor)
+        self.assertIsInstance(samples["Z"], tf.Tensor)
+        self.assertIsInstance(samples["Y"], tf.Tensor)
+
+        # test 2: with intervention
+        intervention = {
+            "X": [0.5, None, None],
+            "Z": [None, 0.5, None],
+            "Y": [None, None, None],
+        }
+        samples = draw_samples_from_sem(sem, 3, 3, intervention=intervention)
         self.assertEqual(len(samples), 3)
         self.assertEqual(samples["X"].shape, (3, 3))
         self.assertEqual(samples["Z"].shape, (3, 3))
