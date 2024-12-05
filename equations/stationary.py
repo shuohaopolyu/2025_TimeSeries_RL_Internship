@@ -1,9 +1,11 @@
-from models.sem import StructuralEquationModel
 import tensorflow as tf
 from collections import OrderedDict
 
 
-class StationaryModel(StructuralEquationModel):
+class StationaryModel():
+    """
+    Structural equation models example: stationary model with 3 vertices
+    """
 
     @staticmethod
     def static():
