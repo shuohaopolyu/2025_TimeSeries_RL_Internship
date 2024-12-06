@@ -1,20 +1,21 @@
-from graphs.causalgraph import CausalGraph
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+from causal_graph.base import CausalGraph
 import networkx as nx
 import matplotlib.pyplot as plt
 from utils.sequential_sampling import draw_samples_from_sem
-from equations.stationary import StationaryModel
+from sem.stationary import StationaryModel
 import tensorflow as tf
 from collections import OrderedDict
 import seaborn as sns
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import time
 
 time_start = time.time()
 sem = StationaryModel()
 intervention = {
-    "X": [2., None, None],
-    "Z": [None, -2., None],
+    "X": [-2., None, None],
+    "Z": [None, 5., None],
     "Y": [None, None, None],
 }
 samples_1 = draw_samples_from_sem(sem, num_samples=1000, max_time_step=3, intervention=intervention)
@@ -24,8 +25,8 @@ print('time cost', time_end-time_start, 's')
 time_start = time.time()
 sem = StationaryModel()
 intervention = {
-    "X": [2., None, None],
-    "Z": [None, -2., None],
+    "X": [-2., None, None],
+    "Z": [None, 5., None],
     "Y": [None, None, None],
 }
 epsilon = OrderedDict([("X", tf.zeros([1, 3])), ("Z", tf.zeros([1, 3])), ("Y", tf.zeros([1, 3]))])

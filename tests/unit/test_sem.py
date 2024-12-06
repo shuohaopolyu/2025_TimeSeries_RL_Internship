@@ -1,7 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import unittest
-from equations.stationary import StationaryModel
+from sem.stationary import StationaryModel
 from collections import OrderedDict
 import tensorflow as tf
 import tensorflow_probability as tfp

@@ -1,7 +1,7 @@
 import unittest
-import graphs.utils as utils
-from graphs.causalgraph import CausalGraph
-from graphs.dyncausalgraph import DynCausalGraph
+import causal_graph.utils as utils
+from causal_graph.base import CausalGraph
+from causal_graph.dynamic_graph import DynCausalGraph
 
 
 class TestUtils(unittest.TestCase):
@@ -31,6 +31,11 @@ class TestUtils(unittest.TestCase):
                 ["A", "B", "C"],
             ],
         )
+
+    def test_check_consistency(self):
+        self.assertTrue(utils.check_consistency(["A_0", "A_1", "A_2", "A_3"]))
+        self.assertFalse(utils.check_consistency(["A_0", "A_1", "A_2", "B_3"]))
+        self.assertFalse(utils.check_consistency(["A_0", "A_1", "A_2", "A_4"]))
 
 
 class TestCausalGraph(unittest.TestCase):
@@ -128,43 +133,54 @@ class TestDynCausalGraph(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("Starting tests for graphs.DynCausalGraph")
+        cls.tested_graph = DynCausalGraph(
+            full_vertices = ["A_0", "A_1", "A_2", "B_0", "B_1", "B_2", "C_0", "C_1", "C_2"],
+            full_edges = [
+                ("A_0", "B_0"),
+                ("B_0", "C_0"),
+                ("A_1", "B_1"),
+                ("B_1", "C_1"),
+                ("A_2", "B_2"),
+                ("B_2", "C_2"),
+                ("A_0", "A_1"),
+                ("A_1", "A_2"),
+                ("B_0", "B_1"),
+                ("B_1", "B_2"),
+                ("C_0", "C_1"),
+                ("C_1", "C_2"),
+            ],
+            full_treat_vars = [["A_0", "B_0"], ["A_1", "B_1"], ["A_2", "B_2"]],
+            full_do_vars = [["B_0"], ["A_1"], []],
+            full_output_vars = ["C_0", "C_1", "C_2"],
+            temporal_index = 0,
+        )
 
     @classmethod
     def tearDownClass(cls):
         print("Finished tests for graphs.DynCausalGraph")
 
     def test_init(self):
-        # test 1: normal initialization, using exmple A1->B1->C1, A2->B2->C2, A3->B3->C3,
-        # A1->A2->A3, B1->B2->B3, C1->C2->C3
-        self.tested_graph = DynCausalGraph(
-            full_vertices = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"],
-            full_edges = [
-                ("A1", "B1"),
-                ("B1", "C1"),
-                ("A2", "B2"),
-                ("B2", "C2"),
-                ("A3", "B3"),
-                ("B3", "C3"),
-                ("A1", "A2"),
-                ("A2", "A3"),
-                ("B1", "B2"),
-                ("B2", "B3"),
-                ("C1", "C2"),
-                ("C2", "C3"),
-            ],
-            full_treat_vars = [["A1", "B1"], ["A2", "B2"], ["A3", "B3"]],
-            full_do_vars = [[], ["B1"], ["B1", "A2"]],
-            full_output_vars = ["C1", "C2", "C3"],
-            temporal_index = 0,
-        )
         # graph should be A1->B1->C1
-        self.assertEqual(list(self.tested_graph.graph.nodes), ["A1", "B1", "C1"])
+        self.assertEqual(list(self.tested_graph.graph.nodes), ["A_0", "B_0", "C_0"])
 
-        # test 2: setting time_step
+    def test_set_temporal_index_do_vars(self):
+        # setting time_step
         self.tested_graph.temporal_index = 1
         self.assertEqual(len(list(self.tested_graph.graph.nodes)), 6)
-        self.assertTrue(("A1", "B1") not in self.tested_graph.graph.edges)
+        self.assertTrue(("A_0", "B_0") not in self.tested_graph.graph.edges)
         self.tested_graph.temporal_index = 2
         self.assertEqual(len(list(self.tested_graph.graph.nodes)), 8)
-        self.assertTrue(("A1", "A2") not in self.tested_graph.graph.edges)
-        self.assertTrue(("A1", "B1") not in self.tested_graph.graph.edges)
+        self.assertTrue(("A_0", "A_1") not in self.tested_graph.graph.edges)
+        self.assertTrue(("A_0", "B_0") not in self.tested_graph.graph.edges)
+        # setting time_step out of range
+        with self.assertRaises(ValueError):
+            self.tested_graph.temporal_index = 3
+            
+        self.tested_graph.temporal_index = 2
+        # setting full_do_vars
+        self.tested_graph.full_do_vars = [[], ["A_1"], []]
+        self.assertEqual(len(list(self.tested_graph.graph.nodes)), 9)
+        self.assertTrue(("A_0", "A_1") not in self.tested_graph.graph.edges)
+
+
+        

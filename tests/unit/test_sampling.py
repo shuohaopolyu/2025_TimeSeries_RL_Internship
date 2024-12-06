@@ -2,7 +2,7 @@ from utils.sequential_sampling import sample_from_sem, draw_samples_from_sem
 import unittest
 import tensorflow as tf
 from collections import OrderedDict
-from equations.stationary import StationaryModel
+from sem.stationary import StationaryModel
 
 
 class TestSampling(unittest.TestCase):

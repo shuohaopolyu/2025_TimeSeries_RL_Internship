@@ -1,5 +1,5 @@
 import networkx as nx
-from graphs.utils import is_subset, power_set
+from causal_graph.utils import is_subset, power_set
 
 class CausalGraph:
     def __init__(self, vertices: list[str], edges: list[tuple[str, str]], treat_vars: list[str], output_var: str):
@@ -33,7 +33,7 @@ class CausalGraph:
         do_graph = self.do(do_vars)
         return is_subset(do_vars, list(do_graph.nodes))
 
-    def minimal_interven_set(self):
+    def minimal_interven_set(self) -> list[list[str]]:
         # minimal intervention set using a greedy algorithm, check which element of power set is in do_graph
         # algorithm still needs optimization
         close_idx = []
