@@ -44,5 +44,22 @@ class DynCausalBayesOpt:
             # Initialize the exploration set
             exploration_set = self._initialize_exploration_set(temporal_index)
 
+            for trial in range(self.num_trials):
+                # Compute acquisition function for each exploration set
+                pass
+                # Obtain the optimal intervention among all exploration sets
+                pass
+                # Intervene
+                pass
+                # Agument the intervention history
+                pass
+                # Update posterior for each GP model to predict the optimal target variable
+                pass
+
+            # Obtain the optimal intervention for the current time step
+            pass
+
+            # Update the optimal intervention history
+            pass
 
 
