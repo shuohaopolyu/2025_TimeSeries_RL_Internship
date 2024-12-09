@@ -13,7 +13,7 @@ def fit_arcs(dyn_graph: object, D_obs: OrderedDict, emissions: bool) -> dict:
         emissions (bool): if True, the function will return the emission functions
 
     Returns:
-        OrderedDict: contains callable functions that represent the edges
+        dict: contains callable functions that represent the edges
     """
     fcns = {t: {} for t in range(len(dyn_graph.full_output_vars))}
     pass
