@@ -93,11 +93,11 @@ class TestSampling(unittest.TestCase):
     def test_draw_samples_from_sem(self):
         # test 1: no intervention
         sem = StationaryModel()
-        samples = draw_samples_from_sem(sem, 3, 3)
+        samples = draw_samples_from_sem(sem, 4, 3)
         self.assertEqual(len(samples), 3)
-        self.assertEqual(samples["X"].shape, (3, 3))
-        self.assertEqual(samples["Z"].shape, (3, 3))
-        self.assertEqual(samples["Y"].shape, (3, 3))
+        self.assertEqual(samples["X"].shape, (4, 3))
+        self.assertEqual(samples["Z"].shape, (4, 3))
+        self.assertEqual(samples["Y"].shape, (4, 3))
         self.assertIsInstance(samples["X"], tf.Tensor)
         self.assertIsInstance(samples["Z"], tf.Tensor)
         self.assertIsInstance(samples["Y"], tf.Tensor)
@@ -108,11 +108,11 @@ class TestSampling(unittest.TestCase):
             "Z": [None, 0.5, None],
             "Y": [None, None, None],
         }
-        samples = draw_samples_from_sem(sem, 3, 3, intervention=intervention)
+        samples = draw_samples_from_sem(sem, 5, 3, intervention=intervention)
         self.assertEqual(len(samples), 3)
-        self.assertEqual(samples["X"].shape, (3, 3))
-        self.assertEqual(samples["Z"].shape, (3, 3))
-        self.assertEqual(samples["Y"].shape, (3, 3))
+        self.assertEqual(samples["X"].shape, (5, 3))
+        self.assertEqual(samples["Z"].shape, (5, 3))
+        self.assertEqual(samples["Y"].shape, (5, 3))
         self.assertIsInstance(samples["X"], tf.Tensor)
         self.assertIsInstance(samples["Z"], tf.Tensor)
         self.assertIsInstance(samples["Y"], tf.Tensor)
