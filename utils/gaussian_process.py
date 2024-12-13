@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
+from collections import OrderedDict
 
 
 def build_gprm(
@@ -94,3 +95,47 @@ def build_gprm(
     )
 
     return gprm, losses, is_early_stopping
+
+
+def clone_gprm(gprm, new_index_points):
+    """Clones an existing GaussianProcessRegressionModel with new index points."""
+    return tfp.distributions.GaussianProcessRegressionModel(
+        kernel=gprm.kernel,
+        index_points=new_index_points,
+        observation_index_points=gprm.observation_index_points,
+        observations=gprm.observations,
+        observation_noise_variance=gprm.observation_noise_variance,
+    )
+
+
+def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
+    assert (
+        len(observation_data.shape) == 1
+    ), "Variable observation_data should be 1D tensor."
+    assert (
+        observation_data.shape[0] > 1
+    ), "Variable observation_data should have more than 1 element."
+    mean_obs = tf.reduce_mean(observation_data)
+    std_obs = tf.math.reduce_std(observation_data)
+
+    def gaussian_variable(sample):
+        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample()
+
+    return gaussian_variable
+
+
+def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
+
+    def gaussian_process(sample: OrderedDict):
+        index_x = []
+        for parent in predecessors:
+            parent_name, parent_index = parent.split("_")
+            ipt_of_this_parent = sample[parent_name][int(parent_index)]
+            index_x.append(ipt_of_this_parent)
+        index_x = tf.reshape(tf.convert_to_tensor(index_x), [1, -1])
+        assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
+        assert index_x.shape[1] == len(predecessors), "Variable index_x should have the same length as the predecessors."
+        new_gprm = clone_gprm(gprm, index_x)
+        return new_gprm.sample()
+    
+    return gaussian_process

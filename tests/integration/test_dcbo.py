@@ -2,6 +2,8 @@ import unittest
 from methods.dcbo import DynCausalBayesOpt
 from causal_graph.dynamic_graph import DynCausalGraph
 from sem.stationary import StationaryModel
+from utils.sequential_sampling import draw_samples_from_sem
+from collections import OrderedDict
 
 
 class TestDynCausalBayesOpt(unittest.TestCase):
@@ -36,7 +38,24 @@ class TestDynCausalBayesOpt(unittest.TestCase):
             temporal_index,
         )
         sem = StationaryModel()
-        cls.dcbo_stat = DynCausalBayesOpt(dyn_graph, sem, num_trials=10, task="min")
+        D_obs = draw_samples_from_sem(sem, 4, 3)
+
+        intervention = {
+            "X": [0.5, None, None],
+            "Z": [None, None, None],
+            "Y": [None, None, None],
+        }
+        D_interven_ini = draw_samples_from_sem(sem, 1, 3, intervention=intervention)
+        intervention_domain = OrderedDict()
+        cls.dcbo_stat = DynCausalBayesOpt(
+            dyn_graph,
+            sem,
+            D_obs,
+            D_interven_ini,
+            intervention_domain,
+            num_trials=10,
+            task="min",
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -44,11 +63,11 @@ class TestDynCausalBayesOpt(unittest.TestCase):
 
     def test_initialize_exploration_set(self):
         exploration_set = self.dcbo_stat._initialize_exploration_set(0)
-        self.assertEqual(exploration_set,  [["X_0"], ["Z_0"]])
+        self.assertEqual(exploration_set, [["X_0"], ["Z_0"]])
         exploration_set = self.dcbo_stat._initialize_exploration_set(1)
-        self.assertEqual(exploration_set,  [["X_1"], ["Z_1"]])
+        self.assertEqual(exploration_set, [["X_1"], ["Z_1"]])
         exploration_set = self.dcbo_stat._initialize_exploration_set(2)
-        self.assertEqual(exploration_set,  [["X_2"], ["Z_2"]])
+        self.assertEqual(exploration_set, [["X_2"], ["Z_2"]])
 
     def test_optimize(self):
         pass

@@ -6,7 +6,9 @@ from utils.costs import equal_cost
 
 
 class DynCausalBayesOpt:
-    # not tested
+    """
+    Dynamic Causal Bayesian Optimization
+    """
     def __init__(
         self,
         dyn_graph,
