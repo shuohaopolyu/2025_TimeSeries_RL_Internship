@@ -59,7 +59,7 @@ def draw_samples_from_sem(
         epsilon = OrderedDict([(key, tfd.Normal(0.0, 1.0).sample([num_samples, max_time_step])) for key in samples.keys()])
     else:
         for key in samples.keys():
-            assert epsilon[key].shape == (num_samples, max_time_step)
+            assert epsilon[key].shape == (num_samples, max_time_step), (epsilon[key].shape, (num_samples, max_time_step))
     for i in range(num_samples):
         i_epsilon = OrderedDict([(key, epsilon[key][i]) for key in epsilon.keys()])
         the_sample = sample_from_sem(sem, max_time_step, intervention, i_epsilon)

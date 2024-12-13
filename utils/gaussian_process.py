@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
+import copy
 
 
 def build_gprm(
@@ -9,9 +10,10 @@ def build_gprm(
     y: tf.Tensor,
     amplitude_factor: float = 1.0,
     length_scale_factor: float = 1.0,
-    obs_noise_factor: float = 0.1,
+    obs_noise_factor: float = 0.01,
     max_training_step: int = 2000,
-    patience: int = 100,
+    learning_rate: float = 1e-3,
+    patience: int = 20,
     debug_mode=False,
 ):
     assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
@@ -46,7 +48,7 @@ def build_gprm(
     )
 
     # Define the optimizer and optimization loop
-    optimizer = tf.optimizers.Adam(learning_rate=0.01, beta_1=0.5, beta_2=0.99)
+    optimizer = tf.optimizers.Adam(learning_rate=learning_rate, beta_1=0.5, beta_2=0.99)
 
     @tf.function
     def optimize():
@@ -82,9 +84,8 @@ def build_gprm(
 
     if debug_mode:
         print(f"Optimization finished at step {step}, Loss {loss_value}")
-
-    if not is_early_stopping:
-        print("Warning: optimization might not converge")
+        if not is_early_stopping:
+            print("Warning: optimization might not converge")
 
     gprm = tfp.distributions.GaussianProcessRegressionModel(
         kernel=kernel,
@@ -95,17 +96,6 @@ def build_gprm(
     )
 
     return gprm, losses, is_early_stopping
-
-
-def clone_gprm(gprm, new_index_points):
-    """Clones an existing GaussianProcessRegressionModel with new index points."""
-    return tfp.distributions.GaussianProcessRegressionModel(
-        kernel=gprm.kernel,
-        index_points=new_index_points,
-        observation_index_points=gprm.observation_index_points,
-        observations=gprm.observations,
-        observation_noise_variance=gprm.observation_noise_variance,
-    )
 
 
 def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
@@ -119,7 +109,9 @@ def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
     std_obs = tf.math.reduce_std(observation_data)
 
     def gaussian_variable(sample):
-        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample()
+        return tf.expand_dims(
+            tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample(1), 0
+        )
 
     return gaussian_variable
 
@@ -134,8 +126,11 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
             index_x.append(ipt_of_this_parent)
         index_x = tf.reshape(tf.convert_to_tensor(index_x), [1, -1])
         assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
-        assert index_x.shape[1] == len(predecessors), "Variable index_x should have the same length as the predecessors."
-        new_gprm = clone_gprm(gprm, index_x)
-        return new_gprm.sample()
-    
+        assert index_x.shape[1] == len(
+            predecessors
+        ), "Variable index_x should have the same length as the predecessors."
+        # sample from the marginal distribution of the Gaussian Process Regression Model
+        # https://github.com/tensorflow/probability/issues/837
+        return gprm.get_marginal_distribution(index_x).sample(1)
+
     return gaussian_process

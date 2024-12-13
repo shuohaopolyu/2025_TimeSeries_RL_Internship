@@ -3,6 +3,7 @@ import tensorflow_probability as tfp
 from collections import OrderedDict
 from utils.sequential_sampling import draw_samples_from_sem
 from utils.costs import equal_cost
+from utils.sem_estimate import sem_hat
 
 
 class DynCausalBayesOpt:
@@ -64,9 +65,6 @@ class DynCausalBayesOpt:
         else:
             raise ValueError("Task should be either 'min' or 'max'.")
 
-    def _sem_hat(self) -> classmethod:
-        pass
-
     def _fy_and_fny(self):
         pass
 
@@ -82,7 +80,7 @@ class DynCausalBayesOpt:
     def _acquisition_function(self):
         pass
 
-    def optimize(self):
+    def run(self):
         for temporal_index in range(self.T):
             if temporal_index > 0:
                 # Initialize dynamic causal GP models for all exploration sets
