@@ -1,7 +1,6 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
-import copy
 
 
 def build_gprm(
@@ -134,3 +133,112 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
         return gprm.get_marginal_distribution(index_x).sample(1)
 
     return gaussian_process
+
+
+# def build_multi_gprm(
+#     x: list[tf.Tensor],
+#     y: tf.Tensor,
+#     amplitude_factor: list[float],
+#     length_scale_factor: list[float],
+#     obs_noise_factor: float,
+#     max_training_step: int = 2000,
+#     learning_rate: float = 1e-3,
+#     patience: int = 20,
+#     debug_mode=False,
+# ):
+#     assert len(x) == len(
+#         amplitude_factor
+#     ), "Length of x and amplitude_factor should be the same."
+#     assert len(x) == len(
+#         length_scale_factor
+#     ), "Length of x and length_scale_factor should be the same."
+#     assert len(y.shape) == 1, "Variable y should be 1D tensor."
+
+#     amplitudes = []
+#     length_scales = []
+#     kernels = []
+#     gprms = []
+#     for i, xi in enumerate(x):
+#         assert len(xi.shape) == 2, "Variable x should be 2D tensor."
+#         amplitudes.append(
+#             tfp.util.TransformedVariable(
+#                 initial_value=amplitude_factor[i],
+#                 bijector=tfp.bijectors.Exp(),
+#                 name="amplitude" + str(i),
+#             )
+#         )
+#         length_scales.append(
+#             tfp.util.TransformedVariable(
+#                 initial_value=length_scale_factor[i],
+#                 bijector=tfp.bijectors.Exp(),
+#                 name="length_scale" + str(i),
+#             )
+#         )
+#         kernels.append(
+#             tfp.math.psd_kernels.ExponentiatedQuadratic(
+#                 amplitude=amplitudes[i], length_scale=length_scales[i]
+#             )
+#         )
+#         if i == 0:
+#             add_kernel = kernels[i]
+#         else:
+#             add_kernel += kernels[i]
+
+#     the_gp = tfp.distributions.GaussianProcess(
+#         kernel=add_kernel,
+#         index_points=x[0],
+#         observation_noise_variance=obs_noise_factor,
+#     )
+
+#     # Define the optimizer and optimization loop
+#     optimizer = tf.optimizers.Adam(learning_rate=learning_rate, beta_1=0.5, beta_2=0.99)
+
+#     @tf.function
+#     def optimize():
+#         with tf.GradientTape() as tape:
+#             loss = -the_gp.log_prob(y)
+#         grads = tape.gradient(loss, the_gp.trainable_variables)
+#         optimizer.apply_gradients(zip(grads, the_gp.trainable_variables))
+#         return loss
+
+#     best_loss = float("inf")
+#     patience_counter = 0
+#     losses = []
+#     is_early_stopping = False
+
+#     for step in range(max_training_step):
+#         loss_value = optimize()
+#         losses.append(loss_value)
+
+#         if debug_mode:
+#             if step % 100 == 0:
+#                 print(f"Step {step}, Loss {loss_value}")
+
+#         if loss_value < best_loss:
+#             best_loss = loss_value
+#             patience_counter = 0
+#         else:
+#             patience_counter += 1
+
+#         if patience_counter > patience:
+#             print(f"Early stopping at step {step}")
+#             is_early_stopping = True
+#             break
+
+#     if debug_mode:
+#         print(f"Optimization finished at step {step}, Loss {loss_value}")
+#         if not is_early_stopping:
+#             print("Warning: optimization might not converge")
+
+#     for i, xi in enumerate(x):
+#         gprms.append(
+#             tfp.distributions.GaussianProcessRegressionModel(
+#                 kernel=kernels[i],
+#                 index_points=xi,
+#                 observation_index_points=xi,
+#                 observations=y,
+#                 observation_noise_variance=obs_noise_factor[i],
+#             )
+#         )
+
+#     return gprms, losses, is_early_stopping

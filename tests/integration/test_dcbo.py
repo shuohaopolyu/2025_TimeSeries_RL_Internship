@@ -62,12 +62,8 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         print("Finished tests for methods.dcbo")
 
     def test_initialize_exploration_set(self):
-        exploration_set = self.dcbo_stat._initialize_exploration_set(0)
-        self.assertEqual(exploration_set, [["X_0"], ["Z_0"]])
-        exploration_set = self.dcbo_stat._initialize_exploration_set(1)
-        self.assertEqual(exploration_set, [["X_1"], ["Z_1"]])
-        exploration_set = self.dcbo_stat._initialize_exploration_set(2)
-        self.assertEqual(exploration_set, [["X_2"], ["Z_2"]])
+        exploration_set = self.dcbo_stat._initialize_exploration_set()
+        self.assertEqual(exploration_set, [["X"], ["Z"]])
 
-    def test_optimize(self):
+    def test_run(self):
         pass

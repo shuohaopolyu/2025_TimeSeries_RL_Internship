@@ -1,13 +1,13 @@
 import unittest
 import tensorflow as tf
 import tensorflow_probability as tfp
-from utils.sem_estimate import fcns4sem, sem_hat
+from utils.sem_estimate import fcns4sem, sem_hat, fy_and_fny
 from causal_graph.dynamic_graph import DynCausalGraph
 from utils.sequential_sampling import sample_from_sem, draw_samples_from_sem
 from sem.stationary import StationaryModel
 from collections import OrderedDict
 
-seed = 111
+seed = 1111
 tf.random.set_seed(seed)
 
 
@@ -46,16 +46,16 @@ class TestSemEstimate(unittest.TestCase):
             full_output_vars=["Y_0", "Y_1", "Y_2"],
             temporal_index=2,
         )
-        num_samples = 20
+        num_samples = 50
         sem = StationaryModel()
         x_eps_0 = tfp.distributions.Normal(0.0, 1.0).sample((num_samples, 1))
-        x_eps_1_2 = tfp.distributions.Normal(0.0, 0.01).sample((num_samples, 2))
+        x_eps_1_2 = tfp.distributions.Normal(0.0, 0.001).sample((num_samples, 2))
         x_eps = tf.concat([x_eps_0, x_eps_1_2], axis=1)
         epsilon = OrderedDict(
             [
                 ("X", x_eps),
-                ("Z", tfp.distributions.Normal(0.0, 0.01).sample((num_samples, 3))),
-                ("Y", tfp.distributions.Normal(0.0, 0.01).sample((num_samples, 3))),
+                ("Z", tfp.distributions.Normal(0.0, 0.001).sample((num_samples, 3))),
+                ("Y", tfp.distributions.Normal(0.0, 0.001).sample((num_samples, 3))),
             ]
         )
         cls.D_obs = draw_samples_from_sem(sem, num_samples, 3, epsilon=epsilon)
@@ -72,8 +72,15 @@ class TestSemEstimate(unittest.TestCase):
         self.assertIsInstance(fcns[2], OrderedDict)
         self.assertIsInstance(fcns[0]["X"](0), tf.Tensor)
 
+        fcns = fcns4sem(self.tested_graph.graph, self.D_obs, temporal_index=1)
+        self.assertEqual(len(fcns), 3)
+        self.assertEqual(len(fcns[0]), 0)
+        self.assertEqual(len(fcns[1]), 3)
+        self.assertEqual(len(fcns[2]), 0)
+
     def test_sem_hat(self):
-        sem = sem_hat(self.tested_graph.graph, self.D_obs)()
+        fcns = fcns4sem(self.tested_graph.graph, self.D_obs)
+        sem = sem_hat(fcns)()
         the_sample = OrderedDict([(key, []) for key in sem.static().keys()])
         static_fcns = sem.static()
 
@@ -131,3 +138,9 @@ class TestSemEstimate(unittest.TestCase):
                 the_sample["Y"], true_sample["Y"], rtol=1e-1, atol=1e-1, equal_nan=False
             ),
         )
+
+    def test_fy_and_fny(self):
+        fy_fcns, fny_fcns = fy_and_fny(self.tested_graph.graph, self.D_obs, target_node_name="Y")
+        self.assertEqual(len(fy_fcns), 3)
+        self.assertEqual(len(fny_fcns), 3)
+        # the test is not complete.

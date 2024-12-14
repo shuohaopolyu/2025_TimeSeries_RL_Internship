@@ -10,6 +10,7 @@ class DynCausalBayesOpt:
     """
     Dynamic Causal Bayesian Optimization
     """
+
     def __init__(
         self,
         dyn_graph,
@@ -20,6 +21,7 @@ class DynCausalBayesOpt:
         num_trials: int,
         task: str = "min",
         cost_fcn: callable = equal_cost,
+        num_anchor_points: int = 100,
     ):
         self.dyn_graph = dyn_graph
         self.sem = sem
@@ -34,27 +36,21 @@ class DynCausalBayesOpt:
         self.target_var = self.dyn_graph.full_output_vars[-1].split("_")[0]
         self.cost_fcn = cost_fcn
         self.sem_hat = OrderedDict()
+        self.num_anchor_points = num_anchor_points
+        self.exploration_set = self._initialize_exploration_set()
 
-    def _initialize_exploration_set(self, temporal_index) -> list[list[str]]:
-        self.dyn_graph.temporal_index = temporal_index
-        interven_hist = [[] for _ in range(self.T)]
-        for i in range(temporal_index):
-            if self.optimal_interventions[i] is not []:
-                for optimal_intervention in self.optimal_interventions[i]:
-                    interven_hist[i].append(optimal_intervention[0])
-        self.dyn_graph.full_do_vars = interven_hist
+    def _initialize_exploration_set(self) -> list[list[str]]:
+        self.dyn_graph.temporal_index = 0
         mis = self.dyn_graph.minimal_interven_set()
-        delete_idx = []
-        for i, es in enumerate(mis):
-            for var in es:
-                if var.split("_")[1] != str(temporal_index):
-                    delete_idx.append(i)
-                    break
-        keep_idx = [i for i in range(len(mis)) if i not in delete_idx]
-        exploration_set = [mis[i] for i in keep_idx]
         # filter out the empty set
-        exploration_set = [es for es in exploration_set if es]
-        return exploration_set
+        exploration_set = [es for es in mis if es]
+        # Create a new exploration set with modified node identifiers
+        new_exploration_set = []
+        for subset in exploration_set:
+            # Create a new subset by taking the part before '_' in each node identifier
+            new_subset = [node.split("_")[0] for node in subset]
+            new_exploration_set.append(new_subset)
+        return new_exploration_set
 
     def _optimal_observed_target(self, temporal_index: int) -> float:
         # get the minimal value in D_interven[temporal_index]
@@ -64,9 +60,6 @@ class DynCausalBayesOpt:
             return max(self.D_interven[temporal_index].values())
         else:
             raise ValueError("Task should be either 'min' or 'max'.")
-
-    def _fy_and_fny(self):
-        pass
 
     def _pw_do_x_i(self):
         pass
@@ -82,14 +75,13 @@ class DynCausalBayesOpt:
 
     def run(self):
         for temporal_index in range(self.T):
+
             if temporal_index > 0:
                 # Initialize dynamic causal GP models for all exploration sets
                 # using the optimal intervention from the previous time step
                 pass
 
             # Initialize the exploration set
-            exploration_set = self._initialize_exploration_set(temporal_index)
-
             for trial in range(self.num_trials):
                 # Compute acquisition function for each exploration set
                 pass

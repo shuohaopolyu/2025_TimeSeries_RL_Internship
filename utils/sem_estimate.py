@@ -9,7 +9,29 @@ from utils.gaussian_process import (
 import networkx as nx
 
 
-def fcns4sem(the_graph, D_obs: OrderedDict) -> dict:
+def _label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
+    """Given the observation dataset, the target node, and its predecessors, this function will return the observation data
+    for the target node and its predecessors.
+
+    Args:
+        D_obs (OrderedDict): observation dataset
+        node (str): target node
+        predecessors (list): list of predecessors
+
+    Returns:
+        tuple: observation data predecessors and target node
+    """
+    node_name, node_index = node.split("_")
+    obs_data = []
+    for parent in predecessors:
+        parent_name, parent_index = parent.split("_")
+        obs_data.append(D_obs[parent_name][:, int(parent_index)])
+    obs_data_x = tf.stack(obs_data, axis=1)
+    obs_data_y = D_obs[node_name][:, int(node_index)]
+    return obs_data_x, obs_data_y
+
+
+def fcns4sem(the_graph, D_obs: OrderedDict, temporal_index: int = None) -> dict:
     """Each node in the dynamic graph can either be generated based on emission or transition functions.
     Given the observation dataset, this function will fit the emission and transition functions for each node.
 
@@ -31,35 +53,97 @@ def fcns4sem(the_graph, D_obs: OrderedDict) -> dict:
     fcns = {t: OrderedDict() for t in range(max_temporal_index + 1)}
 
     for node in sorted_nodes:
-        temproal_index = int(node.split("_")[1])
+        node_index = int(node.split("_")[1])
         node_name = node.split("_")[0]
+        if temporal_index is not None and node_index != temporal_index:
+            continue
         predecessors = list(the_graph.predecessors(node))
         if not predecessors:
-            obs_data = D_obs[node_name][:, int(temproal_index)]
+            obs_data = D_obs[node_name][:, int(node_index)]
             # simply consider these nodes follow a normal distribution
             # with the mean and std calculated from the observation data
             # practitioners can replace this with more sophisticated models
-            fcns[temproal_index][node_name] = build_gaussian_variable(obs_data)
+            fcns[node_index][node_name] = build_gaussian_variable(obs_data)
         else:
-            obs_data = []
-            for parent in predecessors:
-                parent_name, parent_index = parent.split("_")
-                obs_data.append(D_obs[parent_name][:, int(parent_index)])
-            obs_data_x = tf.stack(obs_data, axis=1)
-            obs_data_y = D_obs[node_name][:, int(temproal_index)]
+            obs_data_x, obs_data_y = _label_pairs(D_obs, node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            fcns[temproal_index][node_name] = build_gaussian_process(gprm, predecessors)
+            fcns[node_index][node_name] = build_gaussian_process(gprm, predecessors)
     return fcns
 
 
-def sem_hat(the_graph: object, D_obs: OrderedDict) -> classmethod:
+def fy_and_fny(
+    the_graph, D_obs: OrderedDict, target_node_name: str, temporal_index: int = None
+) -> dict:
+    # sort the nodes by topological order
+    sorted_nodes = list(nx.topological_sort(the_graph))
+    # find the maximum temporal index
+    max_temporal_index = int(sorted_nodes[-1].split("_")[1])
+    assert (max_temporal_index + 1) == D_obs[sorted_nodes[0].split("_")[0]].shape[
+        1
+    ], "Temporal index mismatch"
+    fy_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
+    fny_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
+
+    for t in range(max_temporal_index):
+        if temporal_index is not None and t != temporal_index:
+            continue
+        current_node = target_node_name + "_" + str(t)
+        predecessors = list(the_graph.predecessors(current_node))
+        y_nodes = []
+        ny_nodes = []
+        assert predecessors, "The target node has no predecessors."
+        for predecessor in predecessors:
+            predecessor_index = int(predecessor.split("_")[1])
+            if predecessor_index < t:
+                y_nodes.append(predecessor)
+            elif predecessor_index == t:
+                ny_nodes.append(predecessor)
+        if y_nodes:
+            # if the target node has predecessors at previous time steps
+            # then based on assumption 1, the target node is impacted by two functions, i.e., transition and emission functions
+            y_nodes_current = [
+                node.split("_")[0] + "_" + str(int(node.split("_")[1]) + 1)
+                for node in y_nodes
+            ]
+            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, y_nodes_current)
+            index_ini = tf.ones((1, len(y_nodes_current)))
+            # build the Gaussian Process Regression Model
+            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
+            fy_fcns[t][current_node] = build_gaussian_process(gprm, y_nodes)
+
+            # build the emission function
+            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, ny_nodes)
+            for j in range(obs_data_y.shape[0]):
+                j_sample = OrderedDict()
+                for key in D_obs.keys():
+                    j_sample[key] = D_obs[key][j]
+                obs_data_y[j] -= fy_fcns[t][current_node](j_sample)
+
+            index_ini = tf.ones((1, len(ny_nodes)))
+            # build the Gaussian Process Regression Model
+            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
+            fny_fcns[t][current_node] = build_gaussian_process(gprm, ny_nodes)
+
+        else:
+            # if the target node has no predecessors at previous time steps
+            # then the target node is impacted by a single emission functions
+            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, predecessors)
+            index_ini = tf.ones((1, len(predecessors)))
+            # build the Gaussian Process Regression Model
+            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
+            fny_fcns[t][current_node] = build_gaussian_process(gprm, predecessors)
+
+    return fy_fcns, fny_fcns
+
+
+def sem_hat(fcns) -> classmethod:
 
     class SEMhat:
         def __init__(self):
-            self.fcns = fcns4sem(the_graph, D_obs)
-            self.sorted_nodes = list(self.fcns[0].keys())
+            self.fcns = fcns
+            self.sorted_nodes = list(fcns[0].keys())
 
         def static(self):
             f = OrderedDict()
