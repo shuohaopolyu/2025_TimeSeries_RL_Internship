@@ -31,7 +31,7 @@ def _label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
     return obs_data_x, obs_data_y
 
 
-def fcns4sem(the_graph, D_obs: OrderedDict, temporal_index: int = None) -> dict:
+def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) -> dict:
     """Each node in the dynamic graph can either be generated based on emission or transition functions.
     Given the observation dataset, this function will fit the emission and transition functions for each node.
 
@@ -74,8 +74,27 @@ def fcns4sem(the_graph, D_obs: OrderedDict, temporal_index: int = None) -> dict:
 
 
 def fy_and_fny(
-    the_graph, D_obs: OrderedDict, target_node_name: str, temporal_index: int = None
-) -> dict:
+    the_graph: object,
+    D_obs: OrderedDict,
+    target_node_name: str,
+    temporal_index: int = None,
+) -> tuple:
+    """Given the observation dataset, this function will fit the
+    emission and transition functions for the target node at each time step.
+
+    Args:
+        the_graph (object): graph object for current time step
+        D_obs (OrderedDict): observation dataset
+        target_node_name (str): target node name
+        temporal_index (int, optional): temporal index. Defaults to None. If None,
+        the function will fit the functions for all time steps.
+
+    Returns:
+        tuple: emission and transition dictionaries that contains mean and 
+        covariance functionsat each time step (if temporal_index is None)
+        tuple: emission and transition mean and covariance functions at the 
+        specified time step (if temporal_index is not None)
+    """
     # sort the nodes by topological order
     sorted_nodes = list(nx.topological_sort(the_graph))
     # find the maximum temporal index
@@ -111,20 +130,22 @@ def fy_and_fny(
             index_ini = tf.ones((1, len(y_nodes_current)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            fy_fcns[t][current_node] = build_gaussian_process(gprm, y_nodes)
+            mean_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).mean())
+            std_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).stddev())
+            fy_fcns[t] = [mean_fcn, std_fcn]
 
             # build the emission function
             obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, ny_nodes)
-            for j in range(obs_data_y.shape[0]):
-                j_sample = OrderedDict()
-                for key in D_obs.keys():
-                    j_sample[key] = D_obs[key][j]
-                obs_data_y[j] -= fy_fcns[t][current_node](j_sample)
+            obs_data_x0, _ = _label_pairs(D_obs, current_node, y_nodes)
+            fy_pred = fy_fcns[t][0](obs_data_x0)
+            obs_data_fny = obs_data_y - fy_pred
 
             index_ini = tf.ones((1, len(ny_nodes)))
             # build the Gaussian Process Regression Model
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            fny_fcns[t][current_node] = build_gaussian_process(gprm, ny_nodes)
+            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_fny)
+            mean_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).mean())
+            std_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).stddev())
+            fny_fcns[t] = [mean_fcn, std_fcn]
 
         else:
             # if the target node has no predecessors at previous time steps
@@ -133,9 +154,20 @@ def fy_and_fny(
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            fny_fcns[t][current_node] = build_gaussian_process(gprm, predecessors)
+            mean_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).mean())
+            std_fcn = lambda new_index: tf.squeeze(gprm.get_marginal_distribution(new_index).stddev())
+            fny_fcns[t] = [mean_fcn, std_fcn]
 
-    return fy_fcns, fny_fcns
+            fy_fcns[t] = [None, None]
+            
+
+    if temporal_index is None:
+        return fy_fcns, fny_fcns
+    else:
+        return (
+            fy_fcns[temporal_index],
+            fny_fcns[temporal_index],
+        )
 
 
 def sem_hat(fcns) -> classmethod:
