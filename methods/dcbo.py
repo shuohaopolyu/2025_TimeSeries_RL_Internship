@@ -105,6 +105,12 @@ class DynCausalBayesOpt:
                 mean_fy_f_star = fy_fcn[0](mean_f_star)
                 std_fy_f_star = fy_fcn[1](mean_f_star)
 
+            else:
+                mean_fy_f_star = 0.0
+                std_fy_f_star = 0.0
+
+            # compute fny(x,i,w)
+
             prior_gp[es] = [None, None]
         return prior_gp
 
