@@ -9,7 +9,7 @@ from utils.gaussian_process import (
 import networkx as nx
 
 
-def _label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
+def label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
     """Given the observation dataset, the target node, and its predecessors, this function will return the observation data
     for the target node and its predecessors.
 
@@ -65,7 +65,7 @@ def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) 
             # practitioners can replace this with more sophisticated models
             fcns[node_index][node_name] = build_gaussian_variable(obs_data)
         else:
-            obs_data_x, obs_data_y = _label_pairs(D_obs, node, predecessors)
+            obs_data_x, obs_data_y = label_pairs(D_obs, node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
@@ -126,7 +126,7 @@ def fy_and_fny(
                 node.split("_")[0] + "_" + str(int(node.split("_")[1]) + 1)
                 for node in y_nodes
             ]
-            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, y_nodes_current)
+            obs_data_x, obs_data_y = label_pairs(D_obs, current_node, y_nodes_current)
             index_ini = tf.ones((1, len(y_nodes_current)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
@@ -135,8 +135,8 @@ def fy_and_fny(
             fy_fcns[t] = [mean_fcn, std_fcn]
 
             # build the emission function
-            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, ny_nodes)
-            obs_data_x0, _ = _label_pairs(D_obs, current_node, y_nodes)
+            obs_data_x, obs_data_y = label_pairs(D_obs, current_node, ny_nodes)
+            obs_data_x0, _ = label_pairs(D_obs, current_node, y_nodes)
             fy_pred = fy_fcns[t][0](obs_data_x0)
             obs_data_fny = obs_data_y - fy_pred
 
@@ -148,9 +148,10 @@ def fy_and_fny(
             fny_fcns[t] = [mean_fcn, std_fcn]
 
         else:
+            assert len(ny_nodes) == len(predecessors)
             # if the target node has no predecessors at previous time steps
             # then the target node is impacted by a single emission functions
-            obs_data_x, obs_data_y = _label_pairs(D_obs, current_node, predecessors)
+            obs_data_x, obs_data_y = label_pairs(D_obs, current_node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
