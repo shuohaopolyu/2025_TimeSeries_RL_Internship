@@ -1,5 +1,10 @@
 import unittest
-from utils.gaussian_process import build_gprm, build_gaussian_process, build_gaussian_variable
+from utils.gaussian_process import (
+    build_gprm,
+    build_gaussian_process,
+    build_gaussian_variable,
+)
+from utils.causal_kernel import CausalKernel
 import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
@@ -47,3 +52,53 @@ class TestBuild_gaussian_variable(unittest.TestCase):
         gaussian_variable = build_gaussian_variable(obs_data)
         self.assertIsInstance(gaussian_variable(0), tf.Tensor)
 
+
+class TestCausalKernel(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        print("Starting tests for utils.CausalKernel")
+
+    @classmethod
+    def tearDownClass(cls):
+        print("Finished tests for utils.CausalKernel")
+
+    def test_CausalKernel_returns(self):
+        def tested_causal_std_fn(x):
+            return tf.math.reduce_sum(x, axis=-1)
+
+        kernel = CausalKernel(tested_causal_std_fn, 1, 1)
+        x1 = tf.random.normal([10, 1])
+        apply_result_1 = kernel.apply(x1, x1)
+        self.assertIsInstance(apply_result_1, tf.Tensor)
+        self.assertEqual(apply_result_1.shape, (10))
+
+        x2 = tf.zeros([2, 6, 1])
+        apply_result_2 = kernel.apply(x2, x2)
+        self.assertEqual(apply_result_2.shape, (2, 6))
+
+        x3 = tf.zeros([3, 5, 2])
+        apply_result_3 = kernel.apply(x3, x3)
+        self.assertEqual(apply_result_3.shape, (3, 5))
+
+    def test_test_build_causal_gaussian_process(self):
+        def tested_causal_std_fn(x):
+            return tf.math.reduce_sum(x, axis=-1)
+
+        def tested_mean_fn(x):
+            return tf.math.reduce_sum(x, axis=-1)
+
+        kernel = CausalKernel(tested_causal_std_fn, 1, 1)
+        jitter = 1e-6
+        x = tf.linspace(-1.0, 1.0, 100)
+        y = tf.sin(x * 3.14) + tf.random.normal([100], 0, 0.1)
+        x = x[:, tf.newaxis]
+        index_x = x + jitter
+
+        causalgpm, _, _ = build_gprm(
+            index_x, x, y, mean_fn=tested_mean_fn, causal_std_fn=tested_causal_std_fn
+        )
+
+        self.assertIsInstance(
+            causalgpm, tfp.distributions.GaussianProcessRegressionModel
+        )
+        self.assertIsInstance(causalgpm.mean(), tf.Tensor)
