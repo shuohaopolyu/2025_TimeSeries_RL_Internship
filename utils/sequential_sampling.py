@@ -59,7 +59,7 @@ def draw_samples_from_sem(
     num_samples: int,
     max_time_step: int,
     intervention: dict = None,
-    epsilon: OrderedDict = None,
+    epsilon: OrderedDict | float = None,
     seed: int = None,
 ) -> OrderedDict:
     samples = OrderedDict([(key, []) for key in sem.static().keys()])
@@ -69,6 +69,14 @@ def draw_samples_from_sem(
         epsilon = OrderedDict(
             [
                 (key, tfd.Normal(0.0, 1.0).sample([num_samples, max_time_step]))
+                for key in samples.keys()
+            ]
+        )
+    elif isinstance(epsilon, float):
+        unit_epsilon = epsilon
+        epsilon = OrderedDict(
+            [
+                (key, unit_epsilon*tf.ones([num_samples, max_time_step]))
                 for key in samples.keys()
             ]
         )

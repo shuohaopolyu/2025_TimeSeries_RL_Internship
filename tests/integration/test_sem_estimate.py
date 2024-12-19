@@ -3,6 +3,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from utils.sem_estimate import fcns4sem, sem_hat, fy_and_fny
 from causal_graph.dynamic_graph import DynCausalGraph
+from causal_graph.example_dyn_graphs import three_step_stat
+
 from utils.sequential_sampling import (
     sample_from_sem,
     draw_samples_from_sem,
@@ -20,37 +22,7 @@ class TestSemEstimate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("Starting tests for utils.sem_estimate")
-        cls.tested_graph = DynCausalGraph(
-            full_vertices=[
-                "X_0",
-                "X_1",
-                "X_2",
-                "Z_0",
-                "Z_1",
-                "Z_2",
-                "Y_0",
-                "Y_1",
-                "Y_2",
-            ],
-            full_edges=[
-                ("X_0", "Z_0"),
-                ("Z_0", "Y_0"),
-                ("X_1", "Z_1"),
-                ("Z_1", "Y_1"),
-                ("X_2", "Z_2"),
-                ("Z_2", "Y_2"),
-                ("X_0", "X_1"),
-                ("X_1", "X_2"),
-                ("Z_0", "Z_1"),
-                ("Z_1", "Z_2"),
-                ("Y_0", "Y_1"),
-                ("Y_1", "Y_2"),
-            ],
-            full_treat_vars=[["X_0", "Z_0"], ["X_1", "Z_1"], ["X_2", "Z_2"]],
-            full_do_vars=[[], [], []],
-            full_output_vars=["Y_0", "Y_1", "Y_2"],
-            temporal_index=2,
-        )
+        cls.tested_graph = three_step_stat(2)
         num_samples = 20
         cls.sem = StationaryModel()
         x_eps_0 = tfp.distributions.Normal(0.0, 1.0).sample((num_samples, 1))
