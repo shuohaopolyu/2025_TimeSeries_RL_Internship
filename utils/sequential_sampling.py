@@ -21,7 +21,7 @@ def sample_from_sem(
         for key in intervention:
             assert len(intervention[key]) == max_time_step
     # default epsilon is a dictionary of normal distributions, mean 0 and std 1
-    if not epsilon:
+    if epsilon is None:
         if seed is not None:
             tf.random.set_seed(seed)
         epsilon = OrderedDict(
@@ -63,7 +63,7 @@ def draw_samples_from_sem(
     seed: int = None,
 ) -> OrderedDict:
     samples = OrderedDict([(key, []) for key in sem.static().keys()])
-    if not epsilon:
+    if epsilon is None:
         if seed is not None:
             tf.random.set_seed(seed)
         epsilon = OrderedDict(

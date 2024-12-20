@@ -110,7 +110,7 @@ class TestCausalGraph(unittest.TestCase):
             ["A", "B", "C"], [("A", "B"), ("B", "C")], ["A", "B"], "C"
         )
         self.assertEqual(
-            self.tested_graph.minimal_interven_set().sort(), [[], ["B"], ["A"]].sort()
+            self.tested_graph.minimal_intervene_set().sort(), [[], ["B"], ["A"]].sort()
         )
 
         # using example A_1->A_2->...->A_10->Y
@@ -118,7 +118,7 @@ class TestCausalGraph(unittest.TestCase):
         edges = [(f"A_{i}", f"A_{i+1}") for i in range(1, 10)] + [(f"A_10", "Y")]
         treat_vars = [f"A_{i}" for i in range(1, 11)]
         self.tested_graph = CausalGraph(vertices, edges, treat_vars, "Y")
-        self.assertEqual(len(self.tested_graph.minimal_interven_set()), 11)
+        self.assertEqual(len(self.tested_graph.minimal_intervene_set()), 11)
 
         # using example A1->A2->A3->A4->A5->Y and A6->A7->A8->A9->A10->Y
         vertices = [f"A_{i}" for i in range(1, 11)] + ["Y"]
@@ -126,7 +126,7 @@ class TestCausalGraph(unittest.TestCase):
         edges += [(f"A_{i}", f"A_{i+1}") for i in range(6, 10)] + [(f"A_10", "Y")]
         treat_vars = [f"A_{i}" for i in range(1, 11)]
         self.tested_graph = CausalGraph(vertices, edges, treat_vars, "Y")
-        self.assertEqual(len(self.tested_graph.minimal_interven_set()), 36)
+        self.assertEqual(len(self.tested_graph.minimal_intervene_set()), 36)
 
 
 class TestDynCausalGraph(unittest.TestCase):

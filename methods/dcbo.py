@@ -15,7 +15,7 @@ class DynCausalBayesOpt:
     dyn_graph (callable): The dynamic graph object.
     sem (callable): The structural equation model object.
     D_obs (OrderedDict): The observation data.
-    D_interven_ini (OrderedDict): The initial intervention data.
+    D_intervene_ini (OrderedDict): The initial intervention data.
     intervention_domain (OrderedDict): The domain of each intervention variable.
     num_trials (int): The number of trials for each time step.
     task (str): The optimization task, either 'min' or 'max'.
@@ -30,7 +30,7 @@ class DynCausalBayesOpt:
         dyn_graph: callable,
         sem: callable,
         D_obs: OrderedDict,
-        D_interven_ini: OrderedDict,
+        D_intervene_ini: OrderedDict,
         intervention_domain: OrderedDict,
         num_trials: int,
         task: str = "min",
@@ -48,9 +48,9 @@ class DynCausalBayesOpt:
         assert task in ["min", "max"], "Task should be either 'min' or 'max'."
         self.T = len(self.dyn_graph.full_output_vars)
         self.D_interven = OrderedDict()
-        self.D_interven[0] = D_interven_ini
-        self.opt_interven_history = OrderedDict()
-        self.full_opt_interven_vars = []
+        self.D_interven[0] = D_intervene_ini
+        self.opt_intervene_history = OrderedDict()
+        self.full_opt_intervene_vars = []
         self.target_var = self.dyn_graph.full_output_vars[-1].split("_")[0]
         self.cost_fcn = cost_fcn
         self.sem_hat = OrderedDict()
@@ -82,18 +82,18 @@ class DynCausalBayesOpt:
                     self._suspected_intervention_this_trial()
                 )
                 # Intervene and augment the intervention history
-                self._interven_and_augment(
+                self._intervene_and_augment(
                     temporal_index, suspected_es, suspected_candidate_point
                 )
                 # Update posterior for each GP model to predict the optimal target variable
                 self._posterior_causal_gp(temporal_index)
 
             # Update the optimal intervention history
-            self._update_opt_interven_history(temporal_index)
+            self._update_opt_intervene_history(temporal_index)
 
     def _initialize_exploration_set(self) -> list[list[str]]:
         self.dyn_graph.temporal_index = 0
-        mis = self.dyn_graph.minimal_interven_set()
+        mis = self.dyn_graph.minimal_intervene_set()
         # filter out the empty set
         exploration_set = [es for es in mis if es]
         # Create a new exploration set with modified node identifiers
@@ -104,7 +104,9 @@ class DynCausalBayesOpt:
             general_exploration_set.append(new_subset)
         return general_exploration_set
 
-    def _optimal_interven_value(self, temporal_index: int) -> tuple[tuple[str], list, float]:
+    def _optimal_intervene_value(
+        self, temporal_index: int
+    ) -> tuple[tuple[str], list, float]:
         i_D_interven = self.D_interven[temporal_index]
         extreme_values = []
         for _, sub_dict in i_D_interven.items():
@@ -121,7 +123,7 @@ class DynCausalBayesOpt:
             es_index = tf.keras.backend.eval(tf.argmin(extreme_values))
             es = tuple(i_D_interven.keys())[es_index]
             if type(es) == str:
-                es = (es)
+                es = es
             global_extreme_index = tf.keras.backend.eval(
                 tf.argmin(i_D_interven[es][self.target_var][:, temporal_index])
             )
@@ -131,7 +133,7 @@ class DynCausalBayesOpt:
             es_index = tf.keras.backend.eval(tf.argmax(extreme_values))
             es = tuple(i_D_interven.keys())[es_index]
             if type(es) == str:
-                es = (es)
+                es = es
             global_extreme_index = tf.keras.backend.eval(
                 tf.argmax(i_D_interven[es][self.target_var][:, temporal_index])
             )
@@ -143,17 +145,19 @@ class DynCausalBayesOpt:
 
         return es, es_values, global_extreme
 
-    def _intervene_scheme(self, x_py: list[str], i_py: list[str], x_py_values: list):
+    def _intervene_scheme(
+        self, x_py: list[str], i_py: list[str], x_py_values: list
+    ) -> dict:
         assert len(x_py) == len(
             x_py_values
         ), "Length mismatch between x_py and x_py_values."
-        max_time_step = x_py[0].split("_")[1] + 1
+        max_time_step = int(x_py[0].split("_")[1]) + 1
         sem_keys = list(self.sem.static().keys())
         intervention = {key: [None] * max_time_step for key in sem_keys}
         for node in i_py:
             key = node.split("_")[0]
             node_index = int(node.split("_")[1])
-            opt_es, opt_es_values = self.opt_interven_history[node_index][
+            opt_es, opt_es_values = self.opt_intervene_history[node_index][
                 "decision_vars"
             ]
             intervention[key][node_index] = opt_es_values[opt_es.index(key)]
@@ -163,14 +167,14 @@ class DynCausalBayesOpt:
             intervention[key][node_index] = value
         return intervention
 
-    def _update_opt_interven_vars(self, temporal_index: int) -> None:
-        self.full_opt_interven_vars += self.opt_interven_history[temporal_index][
-            "decision_vars"
-        ][0]
+    def _update_opt_intervene_vars(self, temporal_index: int) -> None:
+        opt_es = self.opt_intervene_history[temporal_index]["decision_vars"][0]
+        for node in opt_es:
+            self.full_opt_intervene_vars.append(node+"_{}".format(temporal_index))
 
-    def _update_opt_interven_history(self, temporal_index: int) -> None:
-        es, es_values, global_extreme = self._optimal_interven_value(temporal_index)
-        self.opt_interven_history[temporal_index] = {
+    def _update_opt_intervene_history(self, temporal_index: int) -> None:
+        es, es_values, global_extreme = self._optimal_intervene_value(temporal_index)
+        self.opt_intervene_history[temporal_index] = {
             "decision_vars": (es, es_values),
             "optimal_value": global_extreme,
         }
@@ -202,8 +206,8 @@ class DynCausalBayesOpt:
             predecessor = predecessor_of_target.copy()
             # Initialize the prior mean and covariance functions for each exploration set
             if fy_fcn[0] is not None:
-                # f_star = self._optimal_interven_value(temporal_index), this could be a substitute to the following line
-                f_star = self.opt_interven_history[temporal_index]["optimal_value"]
+                # f_star = self._optimal_intervene_value(temporal_index), this could be a substitute to the following line
+                f_star = self.opt_intervene_history[temporal_index]["optimal_value"]
                 # compute the mean of fy(f_star)
                 mean_fy_f_star = fy_fcn[0](f_star)
                 std_fy_f_star = fy_fcn[1](f_star)
@@ -221,7 +225,7 @@ class DynCausalBayesOpt:
             i_py = [
                 node
                 for node in previous_py
-                if node.split("_")[0] in self.self.full_opt_interven_vars
+                if node.split("_")[0] in self.self.full_opt_intervene_vars
             ]
 
             def mean_fny_xiw(x_py_values):
@@ -261,16 +265,16 @@ class DynCausalBayesOpt:
             else:
                 # Intervention is performed
                 es_interven = self.D_interven[temporal_index][es]
-                es_interven_x = []
+                es_intervene_x = []
                 for key in es:
-                    es_interven_x.append(es_interven[key][:, temporal_index])
-                es_interven_x = tf.convert_to_tensor(es_interven_x)
-                es_interven_y = es_interven[self.target_var][:, temporal_index]
-                index_x = tf.reshape(es_interven_x[0, :] + self.jitter, [1, -1])
+                    es_intervene_x.append(es_interven[key][:, temporal_index])
+                es_intervene_x = tf.convert_to_tensor(es_intervene_x)
+                es_intervene_y = es_interven[self.target_var][:, temporal_index]
+                index_x = tf.reshape(es_intervene_x[0, :] + self.jitter, [1, -1])
                 causal_gpm, _, _ = build_gprm(
                     index_x,
-                    es_interven_x,
-                    es_interven_y,
+                    es_intervene_x,
+                    es_intervene_y,
                     mean_fn=self.prior_causal_gp[es][0],
                     causal_std_fn=self.prior_causal_gp[es][1],
                     debug_mode=True,
@@ -332,7 +336,7 @@ class DynCausalBayesOpt:
         for es in self.exploration_set:
             candidate_points = self._intervention_points(es)
             self.D_acquisition[es][0] = candidate_points
-            _, _, y_star = self._optimal_interven_value(temporal_index)
+            _, _, y_star = self._optimal_intervene_value(temporal_index)
             posterior_mean_candidate_points = self.posterior_causal_gp[es][0](
                 candidate_points
             )
@@ -371,7 +375,7 @@ class DynCausalBayesOpt:
                 suspected_candidate_point = candidate_points_max
         return suspected_es, suspected_candidate_point
 
-    def _interven_and_augment(
+    def _intervene_and_augment(
         self,
         temporal_index: int,
         suspected_es: list[str],
@@ -382,7 +386,7 @@ class DynCausalBayesOpt:
         }
         if temporal_index >= 1:
             for t in range(temporal_index - 1):
-                es, decision_values = self.D_interven_history[t]["decision_vars"]
+                es, decision_values = self.D_intervene_history[t]["decision_vars"]
                 for node, value in zip(es, decision_values):
                     intervention[node][t] = value
 
