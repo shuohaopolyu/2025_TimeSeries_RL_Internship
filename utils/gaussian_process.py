@@ -13,7 +13,7 @@ def build_gprm(
     length_scale_factor: float = 1.0,
     obs_noise_factor: float = 0.01,
     max_training_step: int = 10000,
-    learning_rate: float = 1e-3,
+    learning_rate: float = 6e-4,
     patience: int = 20,
     mean_fn=None,
     observation_noise_variance=None,
@@ -140,14 +140,15 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
         for parent in predecessors:
             parent_name, parent_index = parent.split("_")
             ipt_of_this_parent = sample[parent_name][int(parent_index)]
-            index_x.append(ipt_of_this_parent)
-        index_x = tf.reshape(tf.convert_to_tensor(index_x), [1, -1])
-        assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
-        assert index_x.shape[1] == len(
+            reshaped_parent_input = tf.reshape(ipt_of_this_parent, (1, 1))
+            index_x.append(reshaped_parent_input)
+        index_x_reshaped = tf.reshape(tf.convert_to_tensor(index_x), (1, -1))
+        assert len(index_x_reshaped.shape) == 2, "Variable index_x should be 2D tensor."
+        assert index_x_reshaped.shape[1] == len(
             predecessors
         ), "Variable index_x should have the same length as the predecessors."
         # sample from the marginal distribution of the Gaussian Process Regression Model
         # https://github.com/tensorflow/probability/issues/837
-        return tf.squeeze(gprm.get_marginal_distribution(index_x).sample(1))
+        return gprm.get_marginal_distribution(index_x_reshaped).sample(1)
 
     return gaussian_process

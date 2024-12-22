@@ -14,7 +14,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         print("Starting tests for methods.dcbo")
         dyn_graph = three_step_stat(0)
         sem = StationaryModel()
-        D_obs = draw_samples_from_sem(sem, 4, 3)
+        D_obs = draw_samples_from_sem(sem, 20, 1)
 
         intervention = {
             "X": [0.5],
@@ -50,7 +50,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         )
 
         # with a zero epsilon, the samples are deterministic, thus monte carlo is not needed
-        D_intervene_ini = OrderedDict([("X", D_intervene_X), ("Z", D_intervene_Z)])
+        D_intervene_ini = OrderedDict([(("X", ), D_intervene_X), (("Z", ), D_intervene_Z)])
         intervention_domain = OrderedDict([("X", [-5.0, 5.0]), ("Z", [-5.0, 20.0])])
         cls.dcbo_stat = DynCausalBayesOpt(
             dyn_graph,
@@ -60,6 +60,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
             intervention_domain,
             num_trials=10,
             task="min",
+            num_monte_carlo=100,
         )
 
     @classmethod
@@ -75,24 +76,24 @@ class TestDynCausalBayesOpt(unittest.TestCase):
 
     def test_optimal_intervene_value(self):
         es, es_values, global_extreme = self.dcbo_stat._optimal_intervene_value(0)
-        self.assertEqual(es, ("Z"))
+        self.assertEqual(es, ("Z", ))
         self.assertTrue(math.isclose(es_values[0], -3.1, abs_tol=1e-6))
         self.assertEqual(
-            global_extreme, self.dcbo_stat.D_interven[0]["Z"]["Y"][0, 0].numpy()
+            global_extreme, self.dcbo_stat.D_interven[0][("Z", )]["Y"][0, 0].numpy()
         )
 
     def test_intervene_scheme(self):
         self.dcbo_stat._update_opt_intervene_history(0)
         x_py = ["X_1"]
         i_py = []
-        x_py_values = [-3.0]
+        x_py_values = tf.constant([[-3.2], [4.2]])
         output_intervention = self.dcbo_stat._intervene_scheme(x_py, i_py, x_py_values)
         true_intervention = {
-            "X": [None, -3.0],
+            "X": [None, -3.2],
             "Z": [None, None],
             "Y": [None, None],
         }
-        self.assertEqual(output_intervention, true_intervention)
+        self.assertEqual(output_intervention[0], true_intervention)
 
     def test_update_opt_intervene_vars(self):
         self.dcbo_stat._update_opt_intervene_history(0)
@@ -106,4 +107,55 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         ipt = self.dcbo_stat._input_fny(the_graph, samples)
         self.assertEqual(ipt.shape, (100, 1))
         self.assertEqual(ipt[0, 0], samples["Z"][0, 2])
+
+    def test_intervention_points(self):
+        for es in self.dcbo_stat.exploration_set:
+            self.assertIsInstance(self.dcbo_stat._intervention_points(es), tf.Tensor)
+            self.assertEqual(
+                self.dcbo_stat._intervention_points(es).shape,
+                (self.dcbo_stat.num_anchor_points, 1),
+            )
+
+    # def test_prior_causal_gp(self):
+    #     self.dcbo_stat._prior_causal_gp(0)
+    #     D_obs = draw_samples_from_sem(self.dcbo_stat.sem, 20, 2)
+    #     self.dcbo_stat.D_obs = D_obs
+    #     self.dcbo_stat._update_opt_intervene_history(0)
+    #     self.dcbo_stat._update_sem_hat(1)
+    #     mean_std_es = self.dcbo_stat._prior_causal_gp(1)
+    #     mean_z = mean_std_es[("Z",)][0]
+    #     std_z = mean_std_es[("Z",)][1]
+    #     example_input = tf.constant([[1.2], [2.3]])
+    #     pred_mean_z = mean_z(example_input)
+    #     pred_std_z = std_z(example_input)
+    #     self.assertIsInstance(pred_mean_z, tf.Tensor)
+    #     self.assertIsInstance(pred_std_z, tf.Tensor)
+    #     self.assertEqual(pred_mean_z.shape, (2, ))
+    #     self.assertEqual(pred_std_z.shape, (2, ))
+
+    def test_posterior_causal_gp(self):
+        D_obs = draw_samples_from_sem(self.dcbo_stat.sem, 20, 2)
+        self.dcbo_stat.D_obs = D_obs
+        self.dcbo_stat._update_opt_intervene_history(0)
+        self.dcbo_stat._update_sem_hat(1)
+        self.dcbo_stat._prior_causal_gp(1)
+
+        intervention = {
+            "X": [None, 3.2],
+            "Z": [None, None],
+            "Y": [None, None],
+        }
+        D_intervene_X = draw_samples_from_sem(
+            self.dcbo_stat.sem, 1, 2, intervention=intervention, epsilon=0.0
+        )
+
+        self.dcbo_stat.D_interven[1] = OrderedDict([(("X", ), D_intervene_X), (("Z", ), None)])
+        mean_std_es = self.dcbo_stat._posterior_causal_gp(1)
+        mean_x = mean_std_es[("X",)][0]
+        std_x = mean_std_es[("X",)][1]
+        example_input = tf.constant([[4.2]])
+        print(mean_x(example_input))
+        self.assertIsInstance(mean_x(example_input), tf.Tensor)
+        self.assertIsInstance(std_x(example_input), tf.Tensor)
+
 

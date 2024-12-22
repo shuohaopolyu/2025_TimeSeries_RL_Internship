@@ -1,6 +1,7 @@
 import tensorflow as tf
 from collections import OrderedDict
 import tensorflow_probability as tfp
+from typing import Union
 
 tfd = tfp.distributions
 
@@ -59,7 +60,7 @@ def draw_samples_from_sem(
     num_samples: int,
     max_time_step: int,
     intervention: dict = None,
-    epsilon: OrderedDict | float = None,
+    epsilon: Union[OrderedDict, float] = None,
     seed: int = None,
 ) -> OrderedDict:
     samples = OrderedDict([(key, []) for key in sem.static().keys()])
@@ -76,7 +77,7 @@ def draw_samples_from_sem(
         unit_epsilon = epsilon
         epsilon = OrderedDict(
             [
-                (key, unit_epsilon*tf.ones([num_samples, max_time_step]))
+                (key, unit_epsilon * tf.ones([num_samples, max_time_step]))
                 for key in samples.keys()
             ]
         )
@@ -105,12 +106,18 @@ def sample_from_sem_hat(
 
     static_sem = sem_hat.static
     dynamic_sem = sem_hat.dynamic
+    keys_static = list(static_sem().keys())
+    keys_dynamic = list(dynamic_sem().keys())
     if intervention is not None:
-        assert set(intervention.keys()) == set(static_sem().keys()).union(
-            set(dynamic_sem().keys())
-        ), "Intervention keys should match the keys of the SEM."
+        assert set(intervention.keys()) == set(keys_static).union(set(keys_dynamic)), (
+            "Intervention keys should match the keys of the SEM.",
+            set(intervention.keys()),
+            set(keys_static).union(set(keys_dynamic)),
+        )
         for key in intervention:
-            assert len(intervention[key]) == max_time_step, "Intervention length should match the max time step."
+            assert (
+                len(intervention[key]) == max_time_step
+            ), "Intervention length should match the max time step."
 
     if seed is not None:
         tf.random.set_seed(seed)
@@ -120,17 +127,27 @@ def sample_from_sem_hat(
     for t in range(max_time_step):
         if t == 0:
             for key in static_sem().keys():
-                if intervention is not None and intervention[key][0] is not None:
-                    the_sample[key].append(intervention[key][0])
+                if intervention is not None and intervention[key][t] is not None:
+                    the_sample[key].append(
+                        tf.reshape(intervention[key][t], (1, 1))
+                    )
                 else:
-                    the_sample[key].append(static_sem()[key](the_sample))
+                    the_sample[key].append(
+                        tf.reshape(static_sem()[key](the_sample), (1, 1))
+                    )
         else:
             for key in dynamic_sem().keys():
                 if intervention is not None and intervention[key][t] is not None:
-                    the_sample[key].append(intervention[key][t])
+                    the_sample[key].append(
+                        tf.reshape(intervention[key][t], (1, 1))
+                    )
                 else:
-                    the_sample[key].append(dynamic_sem()[key](t, the_sample))
+                    the_sample[key].append(
+                        tf.reshape(dynamic_sem()[key](t, the_sample), (1, 1))
+                    )
     for key in the_sample.keys():
+        shapes = [x.shape for x in the_sample[key]]
+        # print(f"Shapes for {key}: {shapes}")
         the_sample[key] = tf.convert_to_tensor(the_sample[key])
     return the_sample
 
@@ -151,6 +168,42 @@ def draw_samples_from_sem_hat(
             samples[key].append(the_sample[key])
 
     for key in samples.keys():
+
         samples[key] = tf.convert_to_tensor(samples[key])
 
     return samples
+
+
+def draw_samples_from_sem_hat_dev(
+    sem_hat: object,
+    num_samples: int,
+    max_time_step: int,
+    intervention: dict = None,
+    seed: int = None,
+) -> OrderedDict:
+
+    if seed is not None:
+        tf.random.set_seed(seed)
+
+    sample = OrderedDict([(key, []) for key in sem_hat.static().keys()])
+
+    for t in range(max_time_step):
+        for key in list(sem_hat.static().keys()):
+            if t == 0:
+                if not intervention and not intervention[key][t]:
+                    sample[key] = tf.ones((num_samples, 1) * intervention[key][t])
+                else:
+                    sample[key] = sem_hat.static()[key](sample)
+            else:
+                if not intervention and not intervention[key][t]:
+                    sample[key] = tf.stack(
+                        sample[key],
+                        tf.ones((num_samples, 1) * intervention[key][t]),
+                        axis=1,
+                    )
+                else:
+                    sample[key] = tf.stack(
+                        sample[key], sem_hat.dynamic()[key](t, sample), axis=1
+                    )
+
+    return sample

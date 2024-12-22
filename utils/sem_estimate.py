@@ -99,13 +99,14 @@ def fy_and_fny(
     sorted_nodes = list(nx.topological_sort(the_graph))
     # find the maximum temporal index
     max_temporal_index = int(sorted_nodes[-1].split("_")[1])
+    # print(max_temporal_index)
     assert (max_temporal_index + 1) == D_obs[sorted_nodes[0].split("_")[0]].shape[
         1
     ], "Temporal index mismatch"
     fy_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
     fny_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
 
-    for t in range(max_temporal_index):
+    for t in range(max_temporal_index+1):
         if temporal_index is not None and t != temporal_index:
             continue
         current_node = target_node_name + "_" + str(t)

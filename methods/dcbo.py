@@ -61,6 +61,8 @@ class DynCausalBayesOpt:
         self.posterior_causal_gp = OrderedDict()
         self.causal_gpm_list = OrderedDict()
         self.jitter = jitter
+        for es in self.exploration_set:
+            self.causal_gpm_list[tuple(es)] = None
 
     def run(self):
         for temporal_index in range(self.T):
@@ -145,32 +147,10 @@ class DynCausalBayesOpt:
 
         return es, es_values, global_extreme
 
-    def _intervene_scheme(
-        self, x_py: list[str], i_py: list[str], x_py_values: list
-    ) -> dict:
-        assert len(x_py) == len(
-            x_py_values
-        ), "Length mismatch between x_py and x_py_values."
-        max_time_step = int(x_py[0].split("_")[1]) + 1
-        sem_keys = list(self.sem.static().keys())
-        intervention = {key: [None] * max_time_step for key in sem_keys}
-        for node in i_py:
-            key = node.split("_")[0]
-            node_index = int(node.split("_")[1])
-            opt_es, opt_es_values = self.opt_intervene_history[node_index][
-                "decision_vars"
-            ]
-            intervention[key][node_index] = opt_es_values[opt_es.index(key)]
-        for node, value in zip(x_py, x_py_values):
-            key = node.split("_")[0]
-            node_index = int(node.split("_")[1])
-            intervention[key][node_index] = value
-        return intervention
-
     def _update_opt_intervene_vars(self, temporal_index: int) -> None:
         opt_es = self.opt_intervene_history[temporal_index]["decision_vars"][0]
         for node in opt_es:
-            self.full_opt_intervene_vars.append(node+"_{}".format(temporal_index))
+            self.full_opt_intervene_vars.append(node + "_{}".format(temporal_index))
 
     def _update_opt_intervene_history(self, temporal_index: int) -> None:
         es, es_values, global_extreme = self._optimal_intervene_value(temporal_index)
@@ -190,6 +170,29 @@ class DynCausalBayesOpt:
                 ny_nodes.append(predecessor)
         return label_pairs(samples, current_node, ny_nodes)[0]
 
+    def _intervene_scheme(
+        self, x_py: list[str], i_py: list[str], x_py_values: tf.Tensor
+    ) -> dict:
+
+        max_time_step = int(x_py[0].split("_")[1]) + 1
+        sem_keys = list(self.sem.static().keys())
+        intervention_scheme = []
+        for i in range(x_py_values.shape[0]):
+            intervention = {key: [None] * max_time_step for key in sem_keys}
+            for node in i_py:
+                key = node.split("_")[0]
+                node_index = int(node.split("_")[1])
+                opt_es, opt_es_values = self.opt_intervene_history[node_index][
+                    "decision_vars"
+                ]
+                intervention[key][node_index] = opt_es_values[opt_es.index(key)]
+            for j, node in enumerate(x_py):
+                key = node.split("_")[0]
+                node_index = int(node.split("_")[1])
+                intervention[key][node_index] = x_py_values[i, j]
+            intervention_scheme.append(intervention)
+        return intervention_scheme
+
     def _prior_causal_gp(self, temporal_index: int) -> OrderedDict:
         # Initialize the prior causal GP model for each exploration set
         # returen an OrderedDict, where the key is the exploration set and the value is a tuple
@@ -207,7 +210,9 @@ class DynCausalBayesOpt:
             # Initialize the prior mean and covariance functions for each exploration set
             if fy_fcn[0] is not None:
                 # f_star = self._optimal_intervene_value(temporal_index), this could be a substitute to the following line
-                f_star = self.opt_intervene_history[temporal_index]["optimal_value"]
+                f_star = tf.constant(
+                    [[self.opt_intervene_history[temporal_index - 1]["optimal_value"]]]
+                )
                 # compute the mean of fy(f_star)
                 mean_fy_f_star = fy_fcn[0](f_star)
                 std_fy_f_star = fy_fcn[1](f_star)
@@ -215,7 +220,9 @@ class DynCausalBayesOpt:
                 predecessor.remove(self.target_var + "_" + str(temporal_index - 1))
                 samples_fy_f_star = tfp.distributions.Normal(
                     mean_fy_f_star, std_fy_f_star
-                ).sample(self.num_monte_carlo)
+                ).sample((self.num_monte_carlo, 1))
+            else:
+                samples_fy_f_star = None
 
             x_py = [x + "_" + str(temporal_index) for x in es]
             # get the subset of the predecessor that subscript is less than temporal_index
@@ -228,40 +235,64 @@ class DynCausalBayesOpt:
                 if node.split("_")[0] in self.self.full_opt_intervene_vars
             ]
 
-            def mean_fny_xiw(x_py_values):
-                intervention = self._intervene_scheme(x_py, i_py, x_py_values)
-                samples = draw_samples_from_sem_hat(
-                    self.sem_estimated,
-                    self.num_monte_carlo,
-                    temporal_index + 1,
-                    intervention=intervention,
-                )
-                input_fny = self._input_fny(samples)
-                samples_mean_fny_xiw = fny_fcn[0](input_fny)
+            def mean_fny_xiw(batch_x_py_values: tf.Tensor):
+                # x_py_values is a tensor of shape (batch_num, len(x_py))
+                # will return a tensor of shape (batch_num, num_monte_carlo, 1)
+                intervention = self._intervene_scheme(x_py, i_py, batch_x_py_values)
+                for i, i_intervention in enumerate(intervention):
+                    i_samples = draw_samples_from_sem_hat(
+                        self.sem_estimated,
+                        self.num_monte_carlo,
+                        temporal_index + 1,
+                        intervention=i_intervention,
+                    )
+                    i_input_fny = self._input_fny(the_graph, i_samples)
+                    i_samples_mean_fny_xiw = fny_fcn[0](i_input_fny)[:, tf.newaxis]
+                    if i == 0:
+                        samples_mean_fny_xiw = i_samples_mean_fny_xiw
+                    else:
+                        samples_mean_fny_xiw = tf.stack(
+                            [samples_mean_fny_xiw, i_samples_mean_fny_xiw], axis=0
+                        )
                 return samples_mean_fny_xiw
 
-            def prior_mean(x_py_values):
-                samples_mean_fny_xiw = mean_fny_xiw(x_py_values)
+            def prior_mean(batch_x_py_values: tf.Tensor):
+                samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
+                batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
-                    return tf.reduce_mean(samples_mean_fny_xiw + samples_fy_f_star)
+                    samples_fy_f_star_tile = tf.tile(
+                        tf.expand_dims(samples_fy_f_star, axis=0), [batch_num, 1, 1]
+                    )
+                    # print(samples_mean_fny_xiw.shape)
+                    # print(samples_fy_f_star_tile.shape)
+                    return tf.reduce_mean(
+                        samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
+                    )
                 else:
-                    return tf.reduce_mean(samples_mean_fny_xiw)
+                    return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
 
-            def prior_std(x_py_values):
-                samples_mean_fny_xiw = mean_fny_xiw(x_py_values)
+            def prior_std(batch_x_py_values: tf.Tensor):
+                samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
+                batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
-                    return tf.math.reduce_std(samples_mean_fny_xiw + samples_fy_f_star)
+                    samples_fy_f_star_tile = tf.tile(
+                        tf.expand_dims(samples_fy_f_star, axis=0), [batch_num, 1, 1]
+                    )
+                    return tf.math.reduce_std(
+                        samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
+                    )
                 else:
-                    return tf.math.reduce_std(samples_mean_fny_xiw)
+                    return tf.math.reduce_std(samples_mean_fny_xiw, axis=[1, 2])
 
-            self.prior_causal_gp[es] = (prior_mean, prior_std)
+            self.prior_causal_gp[tuple(es)] = (prior_mean, prior_std)
         return self.prior_causal_gp
 
     def _posterior_causal_gp(self, temporal_index: int) -> OrderedDict:
         for es in self.exploration_set:
-            if self.D_interven[temporal_index] is None:
+            es = tuple(es)
+            if self.D_interven[temporal_index][es] is None:
                 # No intervention is performed
-                self.posterior_causal_gp[es] = self.prior_causal_gp[es]
+                self.posterior_causal_gp[es] = self.prior_causal_gp[tuple(es)]
             else:
                 # Intervention is performed
                 es_interven = self.D_interven[temporal_index][es]
@@ -291,11 +322,11 @@ class DynCausalBayesOpt:
                     ),
                 )
 
-            def posterior_mean(x_py_values):
-                return causal_gpm.get_margin_distribution(x_py_values).mean()
+            def posterior_mean(x_py_values: tf.Tensor):
+                return causal_gpm.get_marginal_distribution(x_py_values).mean()
 
-            def posterior_std(x_py_values):
-                return causal_gpm.get_margin_distribution(x_py_values).stddev()
+            def posterior_std(x_py_values: tf.Tensor):
+                return causal_gpm.get_marginal_distribution(x_py_values).stddev()
 
             self.posterior_causal_gp[es] = (posterior_mean, posterior_std)
 
@@ -412,8 +443,8 @@ class DynCausalBayesOpt:
                 )
 
     def _update_sem_hat(self, temporal_index: int) -> None:
-        self.dynamic_graph.temporal_index = temporal_index
-        fcns_full = fcns4sem(self.dynamic_graph, self.D_obs)
+        self.dyn_graph.temporal_index = temporal_index
+        fcns_full = fcns4sem(self.dyn_graph.graph, self.D_obs)
         self.sem_estimated = sem_hat(fcns_full)()
 
     def _update_observational_data(self, temporal_index: int) -> None:
