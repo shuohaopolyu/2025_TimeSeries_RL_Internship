@@ -154,8 +154,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         mean_x = mean_std_es[("X",)][0]
         std_x = mean_std_es[("X",)][1]
         example_input = tf.constant([[4.2]])
-        print(mean_x(example_input))
-        self.assertIsInstance(mean_x(example_input), tf.Tensor)
-        self.assertIsInstance(std_x(example_input), tf.Tensor)
+        self.assertEqual(mean_x(example_input).shape, (1, ))
+        self.assertEqual(std_x(example_input).shape, (1, ))
 
 

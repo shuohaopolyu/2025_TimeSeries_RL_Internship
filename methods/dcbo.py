@@ -72,8 +72,11 @@ class DynCausalBayesOpt:
             # Update the estimated SEM model
             self._update_sem_hat(temporal_index)
 
-            # nitialise dynamic causal GP models
+            # initialise dynamic causal GP models
             self._prior_causal_gp(temporal_index)
+
+            # initialise the posterior causal GP models
+            self._posterior_causal_gp(temporal_index)
 
             # Initialize the exploration set
             for trial in range(self.num_trials):
@@ -254,20 +257,26 @@ class DynCausalBayesOpt:
                         samples_mean_fny_xiw = tf.stack(
                             [samples_mean_fny_xiw, i_samples_mean_fny_xiw], axis=0
                         )
+                    if len(intervention) == 1:
+                        samples_mean_fny_xiw = tf.expand_dims(
+                            samples_mean_fny_xiw, axis=0
+                        )
                 return samples_mean_fny_xiw
 
             def prior_mean(batch_x_py_values: tf.Tensor):
+                print("batch_x_py_values", batch_x_py_values.shape)
                 samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
+                print("samples_mean_fny_xiw", samples_mean_fny_xiw.shape)
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
                     samples_fy_f_star_tile = tf.tile(
                         tf.expand_dims(samples_fy_f_star, axis=0), [batch_num, 1, 1]
                     )
-                    # print(samples_mean_fny_xiw.shape)
-                    # print(samples_fy_f_star_tile.shape)
-                    return tf.reduce_mean(
+                    mean_val = tf.reduce_mean(
                         samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
                     )
+                    print("mean_val", mean_val.shape)
+                    return mean_val
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
 
@@ -278,9 +287,10 @@ class DynCausalBayesOpt:
                     samples_fy_f_star_tile = tf.tile(
                         tf.expand_dims(samples_fy_f_star, axis=0), [batch_num, 1, 1]
                     )
-                    return tf.math.reduce_std(
+                    std_val = tf.math.reduce_std(
                         samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
                     )
+                    return std_val
                 else:
                     return tf.math.reduce_std(samples_mean_fny_xiw, axis=[1, 2])
 
