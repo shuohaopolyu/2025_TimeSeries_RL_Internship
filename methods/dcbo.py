@@ -1,7 +1,11 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
-from utils.sequential_sampling import draw_samples_from_sem, draw_samples_from_sem_hat
+from utils.sequential_sampling import (
+    draw_samples_from_sem,
+    draw_samples_from_sem_hat,
+    draw_samples_from_sem_hat_dev,
+)
 from utils.costs import equal_cost
 from utils.sem_estimate import sem_hat, fy_and_fny, label_pairs, fcns4sem
 from utils.gaussian_process import build_gprm
@@ -115,6 +119,8 @@ class DynCausalBayesOpt:
         i_D_interven = self.D_interven[temporal_index]
         extreme_values = []
         for _, sub_dict in i_D_interven.items():
+            if sub_dict is None:
+                continue
             target_tensor = sub_dict[self.target_var]
             sliced_tensor = target_tensor[:, temporal_index]
             if self.task == "min":
@@ -250,17 +256,18 @@ class DynCausalBayesOpt:
                         intervention=i_intervention,
                     )
                     i_input_fny = self._input_fny(the_graph, i_samples)
-                    i_samples_mean_fny_xiw = fny_fcn[0](i_input_fny)[:, tf.newaxis]
+                    i_samples_mean_fny_xiw = tf.expand_dims(fny_fcn[0](i_input_fny)[:, tf.newaxis], axis=0)
                     if i == 0:
                         samples_mean_fny_xiw = i_samples_mean_fny_xiw
                     else:
-                        samples_mean_fny_xiw = tf.stack(
+                        print(samples_mean_fny_xiw.shape, i_samples_mean_fny_xiw.shape)
+                        samples_mean_fny_xiw = tf.concat(
                             [samples_mean_fny_xiw, i_samples_mean_fny_xiw], axis=0
                         )
-                    if len(intervention) == 1:
-                        samples_mean_fny_xiw = tf.expand_dims(
-                            samples_mean_fny_xiw, axis=0
-                        )
+                    # if len(intervention) == 1:
+                    #     samples_mean_fny_xiw = tf.expand_dims(
+                    #         samples_mean_fny_xiw, axis=0
+                    #     )
                 return samples_mean_fny_xiw
 
             def prior_mean(batch_x_py_values: tf.Tensor):
@@ -375,6 +382,9 @@ class DynCausalBayesOpt:
     def _acquisition_function(self, temporal_index: int) -> OrderedDict:
         self.D_acquisition = OrderedDict()
         for es in self.exploration_set:
+            es = tuple(es)
+            print(es)
+            self.D_acquisition[es] = [None, None]
             candidate_points = self._intervention_points(es)
             self.D_acquisition[es][0] = candidate_points
             _, _, y_star = self._optimal_intervene_value(temporal_index)
@@ -399,6 +409,7 @@ class DynCausalBayesOpt:
                     y_star,
                 )
             self.D_acquisition[es][1] = truncated_gaussian.mean() / equal_cost(es)
+            print(self.D_acquisition[es][1])
         return self.D_acquisition
 
     def _suspected_intervention_this_trial(self) -> tuple[list[str], tf.Tensor]:
