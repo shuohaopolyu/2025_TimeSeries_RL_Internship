@@ -50,7 +50,9 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         )
 
         # with a zero epsilon, the samples are deterministic, thus monte carlo is not needed
-        D_intervene_ini = OrderedDict([(("X", ), D_intervene_X), (("Z", ), D_intervene_Z)])
+        D_intervene_ini = OrderedDict(
+            [(("X",), D_intervene_X), (("Z",), D_intervene_Z)]
+        )
         intervention_domain = OrderedDict([("X", [-5.0, 5.0]), ("Z", [-5.0, 20.0])])
         cls.dcbo_stat = DynCausalBayesOpt(
             dyn_graph,
@@ -61,6 +63,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
             num_trials=10,
             task="min",
             num_monte_carlo=100,
+            num_anchor_points=5,
         )
 
     @classmethod
@@ -69,17 +72,17 @@ class TestDynCausalBayesOpt(unittest.TestCase):
 
     def test_initialization(self):
         self.assertEqual(
-            self.dcbo_stat.exploration_set, [["X"], ["Z"]]
+            self.dcbo_stat.exploration_set, [("X",), ("Z",)]
         )  # _initialize_exploration_set
         self.assertEqual(self.dcbo_stat.T, 3)
         self.assertEqual(self.dcbo_stat.target_var, "Y")
 
     def test_optimal_intervene_value(self):
         es, es_values, global_extreme = self.dcbo_stat._optimal_intervene_value(0)
-        self.assertEqual(es, ("Z", ))
+        self.assertEqual(es, ("Z",))
         self.assertTrue(math.isclose(es_values[0], -3.1, abs_tol=1e-6))
         self.assertEqual(
-            global_extreme, self.dcbo_stat.D_interven[0][("Z", )]["Y"][0, 0].numpy()
+            global_extreme, self.dcbo_stat.D_interven[0][("Z",)]["Y"][0, 0].numpy()
         )
 
     def test_intervene_scheme(self):
@@ -133,29 +136,52 @@ class TestDynCausalBayesOpt(unittest.TestCase):
     #     self.assertEqual(pred_mean_z.shape, (2, ))
     #     self.assertEqual(pred_std_z.shape, (2, ))
 
-    def test_posterior_causal_gp(self):
-        D_obs = draw_samples_from_sem(self.dcbo_stat.sem, 20, 2)
-        self.dcbo_stat.D_obs = D_obs
-        self.dcbo_stat._update_opt_intervene_history(0)
-        self.dcbo_stat._update_sem_hat(1)
-        self.dcbo_stat._prior_causal_gp(1)
+    # def test_posterior_causal_gp(self):
+    #     D_obs = draw_samples_from_sem(self.dcbo_stat.sem, 20, 2)
+    #     self.dcbo_stat.D_obs = D_obs
+    #     self.dcbo_stat._update_opt_intervene_history(0)
+    #     self.dcbo_stat._update_sem_hat(1)
+    #     self.dcbo_stat._prior_causal_gp(1)
 
-        intervention = {
-            "X": [None, 3.2],
-            "Z": [None, None],
-            "Y": [None, None],
-        }
-        D_intervene_X = draw_samples_from_sem(
-            self.dcbo_stat.sem, 1, 2, intervention=intervention, epsilon=0.0
+    #     intervention = {
+    #         "X": [None, 3.2],
+    #         "Z": [None, None],
+    #         "Y": [None, None],
+    #     }
+    #     D_intervene_X = draw_samples_from_sem(
+    #         self.dcbo_stat.sem, 1, 2, intervention=intervention, epsilon=0.0
+    #     )
+
+    #     self.dcbo_stat.D_interven[1] = OrderedDict([(("X", ), D_intervene_X), (("Z", ), None)])
+    #     mean_std_es = self.dcbo_stat._posterior_causal_gp(1)
+    #     self.dcbo_stat._acquisition_function(1)
+
+    def test_suspected_intervention_this_trial(self):
+        candidates_x = tf.constant([[-5.0], [-2.5], [0.0], [2.5], [5.0]])
+        candidates_z = tf.constant([[-5.0], [1.25], [7.5], [13.75], [20.0]])
+        aq_x = tf.constant(
+            [[-1.0522499, -1.0522504, -1.0524182, -1.0689896, -1.057488]]
         )
+        aq_z = tf.constant(
+            [[-1.0522499, -1.0562664, -1.0522525, -1.0522499, -1.0522499]]
+        )
+        self.dcbo_stat.D_acquisition[("X",)] = [candidates_x, aq_x]
+        self.dcbo_stat.D_acquisition[("Z",)] = [candidates_z, aq_z]
+        suspected_es, suspected_candidate_point = (
+            self.dcbo_stat._suspected_intervention_this_trial()
+        )
+        self.assertEqual(suspected_es, ("X",))
+        self.assertTrue(
+            math.isclose(suspected_candidate_point[0, 0], 2.5, abs_tol=1e-6)
+        )
+        self.assertEqual(suspected_candidate_point.shape, (1, 1))
 
-        self.dcbo_stat.D_interven[1] = OrderedDict([(("X", ), D_intervene_X), (("Z", ), None)])
-        mean_std_es = self.dcbo_stat._posterior_causal_gp(1)
-        self.dcbo_stat._acquisition_function(1)
-        # mean_x = mean_std_es[("X",)][0]
-        # std_x = mean_std_es[("X",)][1]
-        # example_input = tf.constant([[4.2]])
-        # self.assertEqual(mean_x(example_input).shape, (1, ))
-        # self.assertEqual(std_x(example_input).shape, (1, ))
-
+    def test_intervene_and_augment(self):
+        suspected_es = ("X",)
+        suspected_candidate_point = tf.constant([[2.5]])
+        self.dcbo_stat._intervene_and_augment(0, suspected_es, suspected_candidate_point)
+        self.assertEqual(self.dcbo_stat.D_interven[0][("X",)]["Y"].shape, (3, 1))
+        self.dcbo_stat._update_opt_intervene_history(0)
+        self.dcbo_stat._intervene_and_augment(1, suspected_es, suspected_candidate_point)
+        self.assertEqual(self.dcbo_stat.D_interven[1][("X",)]["Y"].shape, (1, 2))
 

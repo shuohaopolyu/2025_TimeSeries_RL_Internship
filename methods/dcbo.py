@@ -4,7 +4,6 @@ from collections import OrderedDict
 from utils.sequential_sampling import (
     draw_samples_from_sem,
     draw_samples_from_sem_hat,
-    draw_samples_from_sem_hat_dev,
 )
 from utils.costs import equal_cost
 from utils.sem_estimate import sem_hat, fy_and_fny, label_pairs, fcns4sem
@@ -67,6 +66,7 @@ class DynCausalBayesOpt:
         self.jitter = jitter
         for es in self.exploration_set:
             self.causal_gpm_list[tuple(es)] = None
+        self.D_acquisition = OrderedDict()
 
     def run(self):
         for temporal_index in range(self.T):
@@ -79,11 +79,11 @@ class DynCausalBayesOpt:
             # initialise dynamic causal GP models
             self._prior_causal_gp(temporal_index)
 
-            # initialise the posterior causal GP models
-            self._posterior_causal_gp(temporal_index)
-
             # Initialize the exploration set
             for trial in range(self.num_trials):
+                # initialise the posterior causal GP models
+                self._posterior_causal_gp(temporal_index)
+
                 # Compute acquisition function for each exploration set
                 self._acquisition_function(temporal_index)
                 # Obtain the suspected optimal intervention based on the acquisition function
@@ -94,13 +94,11 @@ class DynCausalBayesOpt:
                 self._intervene_and_augment(
                     temporal_index, suspected_es, suspected_candidate_point
                 )
-                # Update posterior for each GP model to predict the optimal target variable
-                self._posterior_causal_gp(temporal_index)
 
             # Update the optimal intervention history
             self._update_opt_intervene_history(temporal_index)
 
-    def _initialize_exploration_set(self) -> list[list[str]]:
+    def _initialize_exploration_set(self) -> list[tuple[str]]:
         self.dyn_graph.temporal_index = 0
         mis = self.dyn_graph.minimal_intervene_set()
         # filter out the empty set
@@ -110,7 +108,7 @@ class DynCausalBayesOpt:
         for subset in exploration_set:
             # Create a new subset by taking the part before '_' in each node identifier
             new_subset = [node.split("_")[0] for node in subset]
-            general_exploration_set.append(new_subset)
+            general_exploration_set.append(tuple(new_subset))
         return general_exploration_set
 
     def _optimal_intervene_value(
@@ -256,7 +254,9 @@ class DynCausalBayesOpt:
                         intervention=i_intervention,
                     )
                     i_input_fny = self._input_fny(the_graph, i_samples)
-                    i_samples_mean_fny_xiw = tf.expand_dims(fny_fcn[0](i_input_fny)[:, tf.newaxis], axis=0)
+                    i_samples_mean_fny_xiw = tf.expand_dims(
+                        fny_fcn[0](i_input_fny)[:, tf.newaxis], axis=0
+                    )
                     if i == 0:
                         samples_mean_fny_xiw = i_samples_mean_fny_xiw
                     else:
@@ -301,15 +301,14 @@ class DynCausalBayesOpt:
                 else:
                     return tf.math.reduce_std(samples_mean_fny_xiw, axis=[1, 2])
 
-            self.prior_causal_gp[tuple(es)] = (prior_mean, prior_std)
+            self.prior_causal_gp[es] = (prior_mean, prior_std)
         return self.prior_causal_gp
 
     def _posterior_causal_gp(self, temporal_index: int) -> OrderedDict:
         for es in self.exploration_set:
-            es = tuple(es)
-            if self.D_interven[temporal_index][es] is None:
+            if es not in self.D_interven[temporal_index]:
                 # No intervention is performed
-                self.posterior_causal_gp[es] = self.prior_causal_gp[tuple(es)]
+                self.posterior_causal_gp[es] = self.prior_causal_gp[es]
             else:
                 # Intervention is performed
                 es_interven = self.D_interven[temporal_index][es]
@@ -337,6 +336,7 @@ class DynCausalBayesOpt:
                         if self.causal_gpm_list[es] is not None
                         else 1.0
                     ),
+                    max_training_step=1000,
                 )
 
             def posterior_mean(x_py_values: tf.Tensor):
@@ -383,79 +383,93 @@ class DynCausalBayesOpt:
         self.D_acquisition = OrderedDict()
         for es in self.exploration_set:
             es = tuple(es)
-            print(es)
             self.D_acquisition[es] = [None, None]
             candidate_points = self._intervention_points(es)
+            # print(tf.expand_dims(candidate_points, axis=0))
             self.D_acquisition[es][0] = candidate_points
             _, _, y_star = self._optimal_intervene_value(temporal_index)
             posterior_mean_candidate_points = self.posterior_causal_gp[es][0](
-                candidate_points
+                tf.expand_dims(candidate_points, axis=0)
             )
             posterior_std_candidate_points = self.posterior_causal_gp[es][1](
-                candidate_points
+                tf.expand_dims(candidate_points, axis=0)
             )
             if self.task == "min":
                 truncated_gaussian = tfp.distributions.TruncatedNormal(
-                    posterior_mean_candidate_points,
+                    posterior_mean_candidate_points - y_star,
                     posterior_std_candidate_points,
-                    y_star,
-                    float("inf"),
+                    float("-inf"),
+                    0,
                 )
             elif self.task == "max":
                 truncated_gaussian = tfp.distributions.TruncatedNormal(
-                    posterior_mean_candidate_points,
+                    posterior_mean_candidate_points - y_star,
                     posterior_std_candidate_points,
-                    float("-inf"),
-                    y_star,
+                    0,
+                    float("inf"),
                 )
             self.D_acquisition[es][1] = truncated_gaussian.mean() / equal_cost(es)
-            print(self.D_acquisition[es][1])
+            # print(self.D_acquisition[es][1])
         return self.D_acquisition
 
     def _suspected_intervention_this_trial(self) -> tuple[list[str], tf.Tensor]:
         # Find the es and corresponding candidate points with the highest acquisition function value (expected improvement)
         # return the suspected optimal intervention
-        max_ei = float("-inf")
+        _ei = 0.0
         for es in self.exploration_set:
             candidate_points, ei = self.D_acquisition[es]
-            ei_max_this_es = tf.reduce_max(ei)
-            ei_max_index = tf.argmax(ei, axis=0)
-            candidate_points_max = candidate_points[ei_max_index]
-            if ei_max_this_es > max_ei:
-                max_ei = ei_max_this_es
-                suspected_es = es
-                suspected_candidate_point = candidate_points_max
-        return suspected_es, suspected_candidate_point
+            if self.task == "min":
+                ei_min_this_es = tf.reduce_min(ei, axis=1)
+                ei_min_index = tf.argmin(ei, axis=1)
+                candidate_points_min = candidate_points[ei_min_index[0], :]
+                if ei_min_this_es < _ei:
+                    _ei = ei_min_this_es
+                    suspected_es = es
+                    suspected_candidate_point = candidate_points_min
+            elif self.task == "max":
+                ei_max_this_es = tf.reduce_max(ei, axis=1)
+                ei_max_index = tf.argmax(ei, axis=1)
+                candidate_points_max = candidate_points[ei_max_index[0], :]
+                if ei_max_this_es > _ei:
+                    _ei = ei_max_this_es
+                    suspected_es = es
+                    suspected_candidate_point = candidate_points_max
+        return suspected_es, suspected_candidate_point[tf.newaxis, :]
 
     def _intervene_and_augment(
         self,
         temporal_index: int,
-        suspected_es: list[str],
+        suspected_es: tuple[str],
         suspected_candidate_point: tf.Tensor,
     ) -> None:
         intervention = {
             key: [None] * (temporal_index + 1) for key in self.sem.static().keys()
         }
-        if temporal_index >= 1:
-            for t in range(temporal_index - 1):
-                es, decision_values = self.D_intervene_history[t]["decision_vars"]
-                for node, value in zip(es, decision_values):
-                    intervention[node][t] = value
 
-        for node in suspected_es:
-            intervention[node][temporal_index] = suspected_candidate_point
+        for t in range(temporal_index):
+            es, decision_values = self.opt_intervene_history[t]["decision_vars"]
+            for node, value in zip(es, decision_values):
+                intervention[node][t] = tf.constant(value, dtype=tf.float32)
+
+        for i, node in enumerate(suspected_es):
+            intervention[node][temporal_index] = suspected_candidate_point[0, i]
+
 
         samples = draw_samples_from_sem(
             self.sem,
-            self.num_monte_carlo,
-            temporal_index + 1,
+            num_samples = 1,
+            max_time_step = temporal_index + 1,
             intervention=intervention,
+            epsilon=0.0,
         )
+
         mean_samples = OrderedDict()
         for key, value in samples.items():
-            mean_samples[key] = tf.reduce_mean(value, axis=0)
+            mean_samples[key] = tf.reduce_mean(value, axis=0, keepdims=True)
         # Update the intervention history
-        if self.D_interven[temporal_index][suspected_es] is None:
+        if temporal_index not in self.D_interven:
+            self.D_interven[temporal_index] = OrderedDict()
+        if suspected_es not in self.D_interven[temporal_index]:
             self.D_interven[temporal_index][suspected_es] = mean_samples
         else:
             for key, value in mean_samples.items():
