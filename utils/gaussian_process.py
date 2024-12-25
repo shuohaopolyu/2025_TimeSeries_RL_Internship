@@ -11,9 +11,9 @@ def build_gprm(
     y: tf.Tensor,
     amplitude_factor: float = 1.0,
     length_scale_factor: float = 1.0,
-    obs_noise_factor: float = 0.01,
+    obs_noise_factor: float = 0.1,
     max_training_step: int = 10000,
-    learning_rate: float = 6e-4,
+    learning_rate: float = 5e-4,
     patience: int = 20,
     mean_fn=None,
     observation_noise_variance=None,
@@ -145,7 +145,6 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
                 index_x = reshaped_parent_input
             else:
                 index_x = tf.concat([index_x, reshaped_parent_input], axis=1)
-
         assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
         assert index_x.shape[1] == len(
             predecessors

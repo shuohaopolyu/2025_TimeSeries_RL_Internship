@@ -47,9 +47,9 @@ def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) 
     sorted_nodes = list(nx.topological_sort(the_graph))
     # find the maximum temporal index
     max_temporal_index = int(sorted_nodes[-1].split("_")[1])
-    assert (max_temporal_index + 1) == D_obs[sorted_nodes[0].split("_")[0]].shape[
-        1
-    ], "Temporal index mismatch"
+    if D_obs[sorted_nodes[0].split("_")[0]].shape[1] < (max_temporal_index + 1):
+        print("Warning: The observation data is not enough for the maximum temporal step.")
+
     fcns = {t: OrderedDict() for t in range(max_temporal_index + 1)}
 
     for node in sorted_nodes:
@@ -99,10 +99,9 @@ def fy_and_fny(
     sorted_nodes = list(nx.topological_sort(the_graph))
     # find the maximum temporal index
     max_temporal_index = int(sorted_nodes[-1].split("_")[1])
-    # print(max_temporal_index)
-    assert (max_temporal_index + 1) == D_obs[sorted_nodes[0].split("_")[0]].shape[
-        1
-    ], ((max_temporal_index + 1), D_obs[sorted_nodes[0].split("_")[0]].shape[1])
+    if D_obs[sorted_nodes[0].split("_")[0]].shape[1] < (max_temporal_index + 1):
+        print("Warning: The observation data is not enough for the maximum temporal step.")
+
     fy_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
     fny_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
 

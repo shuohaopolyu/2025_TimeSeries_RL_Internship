@@ -2,8 +2,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
 from utils.sequential_sampling import (
-    draw_samples_from_sem,
-    draw_samples_from_sem_hat,
     draw_samples_from_sem_dev,
     draw_samples_from_sem_hat_dev
 
@@ -53,7 +51,7 @@ class DynCausalBayesOpt:
         self.task = task
         assert task in ["min", "max"], "Task should be either 'min' or 'max'."
         self.T = len(self.dyn_graph.full_output_vars)
-        self.D_interven = OrderedDict()
+        self.D_interven = OrderedDict((t, {}) for t in range(self.T))
         self.D_interven[0] = D_intervene_ini
         self.opt_intervene_history = OrderedDict()
         self.full_opt_intervene_vars = []
@@ -72,6 +70,7 @@ class DynCausalBayesOpt:
         self.D_acquisition = OrderedDict()
 
     def run(self):
+        """Run Dynamic Causal Bayesian Optimization"""
         for temporal_index in range(self.T):
             # Update the observational data
             self._update_observational_data(temporal_index)
@@ -97,9 +96,16 @@ class DynCausalBayesOpt:
                 self._intervene_and_augment(
                     temporal_index, suspected_es, suspected_candidate_point
                 )
-
-            # Update the optimal intervention history
-            self._update_opt_intervene_history(temporal_index)
+                print("Temporal index:", temporal_index)
+                print("Trial:", trial)
+                print("Intervened exploration set:", suspected_es)
+                print("Intervention point:", suspected_candidate_point)
+                print("Target variable value:", self.D_interven[temporal_index][suspected_es][self.target_var][-1])
+                # Update the optimal intervention history
+                self._update_opt_intervene_history(temporal_index)
+                print("Optimal value:", self.opt_intervene_history[temporal_index]["optimal_value"])
+            
+            print("Dynamic causal Bayesian optimization at time step {} is completed.".format(temporal_index))
 
     def _initialize_exploration_set(self) -> list[tuple[str]]:
         self.dyn_graph.temporal_index = 0
@@ -118,6 +124,8 @@ class DynCausalBayesOpt:
         self, temporal_index: int
     ) -> tuple[tuple[str], list, float]:
         i_D_interven = self.D_interven[temporal_index]
+        if len(i_D_interven) == 0:
+            return None, None, 0.0
         extreme_values = []
         for _, sub_dict in i_D_interven.items():
             if sub_dict is None:
@@ -267,10 +275,6 @@ class DynCausalBayesOpt:
                         samples_mean_fny_xiw = tf.concat(
                             [samples_mean_fny_xiw, i_samples_mean_fny_xiw], axis=0
                         )
-                    # if len(intervention) == 1:
-                    #     samples_mean_fny_xiw = tf.expand_dims(
-                    #         samples_mean_fny_xiw, axis=0
-                    #     )
                 return samples_mean_fny_xiw
 
             def prior_mean(batch_x_py_values: tf.Tensor):
@@ -285,7 +289,6 @@ class DynCausalBayesOpt:
                     mean_val = tf.reduce_mean(
                         samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
                     )
-                    # print("mean_val", mean_val.shape)
                     return mean_val
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
@@ -329,7 +332,6 @@ class DynCausalBayesOpt:
                     es_intervene_y,
                     mean_fn=self.prior_causal_gp[es][0],
                     causal_std_fn=self.prior_causal_gp[es][1],
-                    debug_mode=True,
                     obs_noise_factor=0.0,
                     amplitude_factor=(
                         self.causal_gpm_list[es].kernel.amplitude
@@ -341,7 +343,7 @@ class DynCausalBayesOpt:
                         if self.causal_gpm_list[es] is not None
                         else 1.0
                     ),
-                    max_training_step=1000,
+                    max_training_step=10000,
                 )
 
                 def posterior_mean(x_py_values: tf.Tensor):
@@ -359,26 +361,26 @@ class DynCausalBayesOpt:
         # return the candidate points
         if len(es) == 1:
             intervention_min, intervention_max = self.intervention_domain[es[0]]
-            candidate_points = tf.linspace(
-                intervention_min, intervention_max, self.num_anchor_points
-            )[:, tf.newaxis]
+            candidate_points = tf.random.uniform(
+                (self.num_anchor_points, 1), intervention_min, intervention_max
+            )
         else:
             for i, node in enumerate(es):
                 if i == 0:
                     intervention_min, intervention_max = self.intervention_domain[node]
-                    candidate_points = tf.linspace(
-                        intervention_min, intervention_max, self.num_anchor_points
-                    )[:, tf.newaxis]
+                    candidate_points = tf.random.uniform(
+                        (self.num_anchor_points, 1), intervention_min, intervention_max
+                    )
                 else:
                     intervention_min, intervention_max = self.intervention_domain[node]
                     candidate_points = tf.concat(
                         [
                             candidate_points,
-                            tf.linspace(
+                            tf.random.uniform(
+                                (self.num_anchor_points, 1),
                                 intervention_min,
                                 intervention_max,
-                                self.num_anchor_points,
-                            )[:, tf.newaxis],
+                            ),
                         ],
                         axis=1,
                     )
@@ -392,12 +394,21 @@ class DynCausalBayesOpt:
             # print(tf.expand_dims(candidate_points, axis=0))
             self.D_acquisition[es][0] = candidate_points
             _, _, y_star = self._optimal_intervene_value(temporal_index)
-            posterior_mean_candidate_points = self.posterior_causal_gp[es][0](
-                tf.expand_dims(candidate_points, axis=0)
+            if es not in self.D_interven[temporal_index]:
+                posterior_mean_candidate_points = (self.posterior_causal_gp[es][0](
+                    candidate_points))[tf.newaxis, :]
+                posterior_std_candidate_points = (self.posterior_causal_gp[es][1](
+                    candidate_points))[tf.newaxis, :]
+            else:
+                posterior_mean_candidate_points = self.posterior_causal_gp[es][0](
+                    tf.expand_dims(candidate_points, axis=0)
+                )
+                posterior_std_candidate_points = self.posterior_causal_gp[es][1](
+                    tf.expand_dims(candidate_points, axis=0)
             )
-            posterior_std_candidate_points = self.posterior_causal_gp[es][1](
-                tf.expand_dims(candidate_points, axis=0)
-            )
+            # print(es)
+            # print(posterior_mean_candidate_points)
+            # print(posterior_std_candidate_points)
             if self.task == "min":
                 truncated_gaussian = tfp.distributions.TruncatedNormal(
                     posterior_mean_candidate_points - y_star,
@@ -457,7 +468,6 @@ class DynCausalBayesOpt:
 
         for i, node in enumerate(suspected_es):
             intervention[node][temporal_index] = suspected_candidate_point[0, i]
-
 
         samples = draw_samples_from_sem_dev(
             self.sem,

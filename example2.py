@@ -2,6 +2,7 @@ import tensorflow as tf
 from utils.gaussian_process import build_gprm
 import matplotlib.pyplot as plt
 import tensorflow_probability as tfp
+import seaborn as sns
 
 num_data = 30
 num_data_plt = 1000
@@ -16,9 +17,10 @@ mean_fn = lambda x: tf.sin(x * 3.14)[:, 0]
 gpm, _, _ = build_gprm(
     index_points, obs_index, obs, debug_mode=True
 )
-new_index_points = tf.constant([[-0.3], [0.8]], dtype=tf.float32)
-print(new_index_points.shape)
-print(gpm.get_marginal_distribution(new_index_points).sample())
+new_index_points = tf.constant([[0.8] for _ in range(10000)], dtype=tf.float32)
+sample_at_dot_8 = gpm.get_marginal_distribution(new_index_points).sample()
+
+print(sample_at_dot_8)
 
 upper, lower = gpm.mean() + 2 * gpm.stddev(), gpm.mean() - 2 * gpm.stddev()
 plt.plot(gpm.index_points, gpm.mean())
@@ -31,6 +33,9 @@ plt.fill_between(
 )
 plt.plot(gpm.index_points, mean_fn(index_points), color="k")
 plt.scatter(obs_index, obs, color="r")
+plt.show()
+
+sns.displot(sample_at_dot_8, kde=True)
 plt.show()
 
 # def causal_std_fn(x):
