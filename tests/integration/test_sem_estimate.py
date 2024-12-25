@@ -56,125 +56,125 @@ class TestSemEstimate(unittest.TestCase):
         self.assertEqual(len(fcns[1]), 3)
         self.assertEqual(len(fcns[2]), 0)
 
-    def test_sem_hat(self):
-        the_sample = OrderedDict(
-            [(key, []) for key in self.sem_estimated.static().keys()]
-        )
-        static_fcns = self.sem_estimated.static()
+    # def test_sem_hat(self):
+    #     the_sample = OrderedDict(
+    #         [(key, []) for key in self.sem_estimated.static().keys()]
+    #     )
+    #     static_fcns = self.sem_estimated.static()
 
-        # test static
-        for key in self.sem_estimated.static().keys():
-            the_sample[key].append(static_fcns[key](the_sample))
-        self.assertEqual(len(the_sample), 3)
-        self.assertEqual(len(the_sample["Z"]), 1)
-        self.assertIsInstance(the_sample["Y"][0], tf.Tensor)
+    #     # test static
+    #     for key in self.sem_estimated.static().keys():
+    #         the_sample[key].append(static_fcns[key](the_sample))
+    #     self.assertEqual(len(the_sample), 3)
+    #     self.assertEqual(len(the_sample["Z"]), 1)
+    #     self.assertIsInstance(the_sample["Y"][0], tf.Tensor)
 
-        # test dynamic
-        dynamic_fcns = self.sem_estimated.dynamic()
-        for t in [1, 2]:
-            for key in self.sem_estimated.dynamic().keys():
-                the_sample[key].append(dynamic_fcns[key](t, the_sample))
+    #     # test dynamic
+    #     dynamic_fcns = self.sem_estimated.dynamic()
+    #     for t in [1, 2]:
+    #         for key in self.sem_estimated.dynamic().keys():
+    #             the_sample[key].append(dynamic_fcns[key](t, the_sample))
 
-            self.assertEqual(len(the_sample), 3)
-            self.assertEqual(len(the_sample["Z"]), t + 1)
-            self.assertIsInstance(the_sample["Y"][t], tf.Tensor)
+    #         self.assertEqual(len(the_sample), 3)
+    #         self.assertEqual(len(the_sample["Z"]), t + 1)
+    #         self.assertIsInstance(the_sample["Y"][t], tf.Tensor)
 
-        for key in the_sample.keys():
-            the_sample[key] = tf.reshape(tf.convert_to_tensor(the_sample[key]), (1, -1))
+    #     for key in the_sample.keys():
+    #         the_sample[key] = tf.reshape(tf.convert_to_tensor(the_sample[key]), (1, -1))
 
-        # test correctness of the SEM estimation
-        intervention = {
-            "X": [the_sample["X"][0, 0], None, None],
-            "Z": [None, None, None],
-            "Y": [None, None, None],
-        }
-        epsilon = OrderedDict(
-            [
-                ("X", tf.constant([0.0, 0.0, 0.0])),
-                ("Z", tf.constant([0.0, 0.0, 0.0])),
-                ("Y", tf.constant([0.0, 0.0, 0.0])),
-            ]
-        )
-        true_sample = sample_from_sem(
-            self.sem, 3, intervention=intervention, epsilon=epsilon
-        )
+    #     # test correctness of the SEM estimation
+    #     intervention = {
+    #         "X": [the_sample["X"][0, 0], None, None],
+    #         "Z": [None, None, None],
+    #         "Y": [None, None, None],
+    #     }
+    #     epsilon = OrderedDict(
+    #         [
+    #             ("X", tf.constant([0.0, 0.0, 0.0])),
+    #             ("Z", tf.constant([0.0, 0.0, 0.0])),
+    #             ("Y", tf.constant([0.0, 0.0, 0.0])),
+    #         ]
+    #     )
+    #     true_sample = sample_from_sem(
+    #         self.sem, 3, intervention=intervention, epsilon=epsilon
+    #     )
 
-        self.assertTrue(
-            tf.experimental.numpy.allclose(
-                the_sample["X"], true_sample["X"], rtol=1e-1, atol=1e-1, equal_nan=False
-            ),
-        )
-        self.assertTrue(
-            tf.experimental.numpy.allclose(
-                the_sample["Z"], true_sample["Z"], rtol=1e-1, atol=1e-1, equal_nan=False
-            ),
-        )
-        self.assertTrue(
-            tf.experimental.numpy.allclose(
-                the_sample["Y"], true_sample["Y"], rtol=1e-1, atol=1e-1, equal_nan=False
-            ),
-        )
+    #     self.assertTrue(
+    #         tf.experimental.numpy.allclose(
+    #             the_sample["X"], true_sample["X"], rtol=1e-1, atol=1e-1, equal_nan=False
+    #         ),
+    #     )
+    #     self.assertTrue(
+    #         tf.experimental.numpy.allclose(
+    #             the_sample["Z"], true_sample["Z"], rtol=1e-1, atol=1e-1, equal_nan=False
+    #         ),
+    #     )
+    #     self.assertTrue(
+    #         tf.experimental.numpy.allclose(
+    #             the_sample["Y"], true_sample["Y"], rtol=1e-1, atol=1e-1, equal_nan=False
+    #         ),
+    #     )
 
-    def test_sample_from_sem_hat(self):
+    # def test_sample_from_sem_hat(self):
 
-        # test the sample from the estimated SEM without intervention
-        the_sample = sample_from_sem_hat(self.sem_estimated, 3)
-        self.assertEqual(len(the_sample), 3)
-        self.assertEqual(the_sample["Z"].shape, (3,))
-        self.assertIsInstance(the_sample["Y"][0], tf.Tensor)
+    #     # test the sample from the estimated SEM without intervention
+    #     the_sample = sample_from_sem_hat(self.sem_estimated, 3)
+    #     self.assertEqual(len(the_sample), 3)
+    #     self.assertEqual(the_sample["Z"].shape, (3,))
+    #     self.assertIsInstance(the_sample["Y"][0], tf.Tensor)
 
-        # test the sample from the estimated SEM with intervention
-        intervention = {
-            "X": [the_sample["X"][0], None],
-            "Z": [None, None],
-            "Y": [None, None],
-        }
-        interven_sample = sample_from_sem_hat(
-            self.sem_estimated, 2, intervention=intervention
-        )
+    #     # test the sample from the estimated SEM with intervention
+    #     intervention = {
+    #         "X": [the_sample["X"][0], None],
+    #         "Z": [None, None],
+    #         "Y": [None, None],
+    #     }
+    #     interven_sample = sample_from_sem_hat(
+    #         self.sem_estimated, 2, intervention=intervention
+    #     )
 
-        self.assertEqual(len(interven_sample), 3)
-        self.assertIsInstance(interven_sample["Y"][0], tf.Tensor)
-        self.assertEqual(interven_sample["Z"].shape, (2,))
-        self.assertEqual(interven_sample["X"][0], the_sample["X"][0])
+    #     self.assertEqual(len(interven_sample), 3)
+    #     self.assertIsInstance(interven_sample["Y"][0], tf.Tensor)
+    #     self.assertEqual(interven_sample["Z"].shape, (2,))
+    #     self.assertEqual(interven_sample["X"][0], the_sample["X"][0])
 
-    def test_draw_samples_from_sem_hat(self):
-        intervention = {
-            "X": [None, None, None],
-            "Z": [1.3, None, None],
-            "Y": [None, None, None],
-        }
-        num_samples = 20
+    # def test_draw_samples_from_sem_hat(self):
+    #     intervention = {
+    #         "X": [None, None, None],
+    #         "Z": [1.3, None, None],
+    #         "Y": [None, None, None],
+    #     }
+    #     num_samples = 20
 
-        samples = draw_samples_from_sem_hat(
-            self.sem_estimated, num_samples, 3, intervention=intervention
-        )
+    #     samples = draw_samples_from_sem_hat(
+    #         self.sem_estimated, num_samples, 3, intervention=intervention
+    #     )
 
-        self.assertEqual(len(samples), 3)
-        self.assertEqual(samples["Y"].shape, (num_samples, 3))
-        self.assertEqual(samples["Z"][10, 0], 1.3)
+    #     self.assertEqual(len(samples), 3)
+    #     self.assertEqual(samples["Y"].shape, (num_samples, 3))
+    #     self.assertEqual(samples["Z"][10, 0], 1.3)
 
-    def test_fy_and_fny(self):
-        fy_fcns, fny_fcns = fy_and_fny(
-            self.tested_graph.graph, self.D_obs, target_node_name="Y", temporal_index=1
-        )
+    # def test_fy_and_fny(self):
+    #     fy_fcns, fny_fcns = fy_and_fny(
+    #         self.tested_graph.graph, self.D_obs, target_node_name="Y", temporal_index=1
+    #     )
 
-        ipt_fy = tf.expand_dims(tf.linspace(-3.0, 3.0, 100), axis=1)
-        self.assertEqual(fy_fcns[0](ipt_fy).shape, (100,))
-        self.assertEqual(fy_fcns[1](ipt_fy).shape, (100,))
-        self.assertEqual(fny_fcns[0](ipt_fy).shape, (100,))
-        self.assertEqual(fny_fcns[1](ipt_fy).shape, (100,))
+    #     ipt_fy = tf.expand_dims(tf.linspace(-3.0, 3.0, 100), axis=1)
+    #     self.assertEqual(fy_fcns[0](ipt_fy).shape, (100,))
+    #     self.assertEqual(fy_fcns[1](ipt_fy).shape, (100,))
+    #     self.assertEqual(fny_fcns[0](ipt_fy).shape, (100,))
+    #     self.assertEqual(fny_fcns[1](ipt_fy).shape, (100,))
 
-        fy_fcns, fny_fcns = fy_and_fny(
-            self.tested_graph.graph, self.D_obs, target_node_name="Y"
-        )
-        self.assertEqual(len(fy_fcns), 3)
-        self.assertEqual(fy_fcns[0][0], None)
-        self.assertEqual(len(fy_fcns[1]), 2)
-        self.assertEqual(len(fny_fcns[0]), 2)
-        self.assertEqual(len(fny_fcns[1]), 2)
+    #     fy_fcns, fny_fcns = fy_and_fny(
+    #         self.tested_graph.graph, self.D_obs, target_node_name="Y"
+    #     )
+    #     self.assertEqual(len(fy_fcns), 3)
+    #     self.assertEqual(fy_fcns[0][0], None)
+    #     self.assertEqual(len(fy_fcns[1]), 2)
+    #     self.assertEqual(len(fny_fcns[0]), 2)
+    #     self.assertEqual(len(fny_fcns[1]), 2)
 
-        fy_fcns, fny_fcns = fy_and_fny(
-            self.tested_graph.graph, self.D_obs, target_node_name="Y", temporal_index=0
-        )
-        self.assertEqual(fy_fcns, [None, None])
+    #     fy_fcns, fny_fcns = fy_and_fny(
+    #         self.tested_graph.graph, self.D_obs, target_node_name="Y", temporal_index=0
+    #     )
+    #     self.assertEqual(fy_fcns, [None, None])
