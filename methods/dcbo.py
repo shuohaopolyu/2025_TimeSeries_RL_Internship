@@ -4,6 +4,9 @@ from collections import OrderedDict
 from utils.sequential_sampling import (
     draw_samples_from_sem,
     draw_samples_from_sem_hat,
+    draw_samples_from_sem_dev,
+    draw_samples_from_sem_hat_dev
+
 )
 from utils.costs import equal_cost
 from utils.sem_estimate import sem_hat, fy_and_fny, label_pairs, fcns4sem
@@ -247,10 +250,10 @@ class DynCausalBayesOpt:
                 # will return a tensor of shape (batch_num, num_monte_carlo, 1)
                 intervention = self._intervene_scheme(x_py, i_py, batch_x_py_values)
                 for i, i_intervention in enumerate(intervention):
-                    i_samples = draw_samples_from_sem_hat(
+                    i_samples = draw_samples_from_sem_hat_dev(
                         self.sem_estimated,
                         self.num_monte_carlo,
-                        temporal_index + 1,
+                        temporal_index,
                         intervention=i_intervention,
                     )
                     i_input_fny = self._input_fny(the_graph, i_samples)
@@ -260,7 +263,7 @@ class DynCausalBayesOpt:
                     if i == 0:
                         samples_mean_fny_xiw = i_samples_mean_fny_xiw
                     else:
-                        print(samples_mean_fny_xiw.shape, i_samples_mean_fny_xiw.shape)
+                        # print(samples_mean_fny_xiw.shape, i_samples_mean_fny_xiw.shape)
                         samples_mean_fny_xiw = tf.concat(
                             [samples_mean_fny_xiw, i_samples_mean_fny_xiw], axis=0
                         )
@@ -271,9 +274,9 @@ class DynCausalBayesOpt:
                 return samples_mean_fny_xiw
 
             def prior_mean(batch_x_py_values: tf.Tensor):
-                print("batch_x_py_values", batch_x_py_values.shape)
+                # print("batch_x_py_values", batch_x_py_values.shape)
                 samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
-                print("samples_mean_fny_xiw", samples_mean_fny_xiw.shape)
+                # print("samples_mean_fny_xiw", samples_mean_fny_xiw.shape)
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
                     samples_fy_f_star_tile = tf.tile(
@@ -282,7 +285,7 @@ class DynCausalBayesOpt:
                     mean_val = tf.reduce_mean(
                         samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1, 2]
                     )
-                    print("mean_val", mean_val.shape)
+                    # print("mean_val", mean_val.shape)
                     return mean_val
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
@@ -313,11 +316,13 @@ class DynCausalBayesOpt:
                 # Intervention is performed
                 es_interven = self.D_interven[temporal_index][es]
                 es_intervene_x = []
-                for key in es:
-                    es_intervene_x.append(es_interven[key][:, temporal_index])
-                es_intervene_x = tf.convert_to_tensor(es_intervene_x)
+                for i, key in enumerate(es):
+                    if i == 0:
+                        es_intervene_x = (es_interven[key][:, temporal_index])[:, tf.newaxis]
+                    else:
+                        es_intervene_x = tf.concat((es_intervene_x, (es_interven[key][:, temporal_index])[:, tf.newaxis]), axis=1)
                 es_intervene_y = es_interven[self.target_var][:, temporal_index]
-                index_x = tf.reshape(es_intervene_x[0, :] + self.jitter, [1, -1])
+                index_x = (es_intervene_x[0, :] + self.jitter)[tf.newaxis, :]
                 causal_gpm, _, _ = build_gprm(
                     index_x,
                     es_intervene_x,
@@ -339,13 +344,13 @@ class DynCausalBayesOpt:
                     max_training_step=1000,
                 )
 
-            def posterior_mean(x_py_values: tf.Tensor):
-                return causal_gpm.get_marginal_distribution(x_py_values).mean()
+                def posterior_mean(x_py_values: tf.Tensor):
+                    return causal_gpm.get_marginal_distribution(x_py_values).mean()
 
-            def posterior_std(x_py_values: tf.Tensor):
-                return causal_gpm.get_marginal_distribution(x_py_values).stddev()
+                def posterior_std(x_py_values: tf.Tensor):
+                    return causal_gpm.get_marginal_distribution(x_py_values).stddev()
 
-            self.posterior_causal_gp[es] = (posterior_mean, posterior_std)
+                self.posterior_causal_gp[es] = (posterior_mean, posterior_std)
 
         return self.posterior_causal_gp
 
@@ -382,7 +387,6 @@ class DynCausalBayesOpt:
     def _acquisition_function(self, temporal_index: int) -> OrderedDict:
         self.D_acquisition = OrderedDict()
         for es in self.exploration_set:
-            es = tuple(es)
             self.D_acquisition[es] = [None, None]
             candidate_points = self._intervention_points(es)
             # print(tf.expand_dims(candidate_points, axis=0))
@@ -455,10 +459,10 @@ class DynCausalBayesOpt:
             intervention[node][temporal_index] = suspected_candidate_point[0, i]
 
 
-        samples = draw_samples_from_sem(
+        samples = draw_samples_from_sem_dev(
             self.sem,
             num_samples = 1,
-            max_time_step = temporal_index + 1,
+            temporal_index = temporal_index,
             intervention=intervention,
             epsilon=0.0,
         )

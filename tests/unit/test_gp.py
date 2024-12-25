@@ -33,7 +33,8 @@ class TestBuild_gprm(unittest.TestCase):
     def test_build_gaussian_process(self):
         gprm, _, _ = build_gprm(self.index_x, self.x, self.y)
         predecessors = ["X_0"]
-        sample = OrderedDict([("X", [0.5, 0.6]), ("Z", [])])
+        data_x = tf.random.normal([100, 1])
+        sample = OrderedDict([("X", data_x), ("Z", [])])
         gp_fcn = build_gaussian_process(gprm, predecessors)
         self.assertIsInstance(gp_fcn(sample), tf.Tensor)
 

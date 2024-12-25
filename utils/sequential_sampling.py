@@ -56,7 +56,7 @@ def sample_from_sem(
 
 
 def draw_samples_from_sem(
-    sem: object,
+    sem: callable,
     num_samples: int,
     max_time_step: int,
     intervention: dict = None,
@@ -97,6 +97,67 @@ def draw_samples_from_sem(
     return samples
 
 
+def draw_samples_from_sem_dev(
+    sem: callable,
+    num_samples: int,
+    temporal_index: int,
+    intervention: dict = None,
+    epsilon: Union[OrderedDict, float] = None,
+    seed: int = None,
+) -> OrderedDict:
+    full_samples = OrderedDict([(key, []) for key in sem.static().keys()])
+    max_time_step = temporal_index + 1
+    # define epsilon for noise in the SEM
+    if epsilon is None:
+        if seed is not None:
+            tf.random.set_seed(seed)
+        epsilon = OrderedDict(
+            [
+                (key, tfd.Normal(0.0, 1.0).sample((num_samples, max_time_step)))
+                for key in full_samples.keys()
+            ]
+        )
+    elif isinstance(epsilon, float):
+        const = epsilon
+        epsilon = OrderedDict(
+            [
+                (key, const * tf.ones((num_samples, max_time_step)))
+                for key in full_samples.keys()
+            ]
+        )
+    else:
+        for key in full_samples.keys():
+            assert epsilon[key].shape == (num_samples, max_time_step), (
+                epsilon[key].shape,
+                (num_samples, max_time_step),
+            )
+
+    # sample from the SEM
+    for i in range(max_time_step):
+        for key in full_samples.keys():
+            if i == 0:
+                if intervention is not None and intervention[key][i] is not None:
+                    full_samples[key] = tf.ones((num_samples, 1)) * intervention[key][i]
+                else:
+                    full_samples[key] = (sem.static()[key](
+                        epsilon[key][:, i], i, full_samples
+                    ))[:, tf.newaxis]
+            else:
+                if intervention is not None and intervention[key][i] is not None:
+                    full_samples[key] = tf.concat(
+                        (full_samples[key],
+                        tf.ones((num_samples, 1)) * intervention[key][i]),
+                        axis=1,
+                    )
+                else:
+                    full_samples[key] = tf.concat(
+                        (full_samples[key],
+                        (sem.dynamic()[key](epsilon[key][:, i], i, full_samples))[:, tf.newaxis]),
+                        axis=1,
+                    )
+    return full_samples
+
+
 def sample_from_sem_hat(
     sem_hat: object,
     max_time_step: int,
@@ -128,9 +189,7 @@ def sample_from_sem_hat(
         if t == 0:
             for key in static_sem().keys():
                 if intervention is not None and intervention[key][t] is not None:
-                    the_sample[key].append(
-                        tf.reshape(intervention[key][t], (1, 1))
-                    )
+                    the_sample[key].append(tf.reshape(intervention[key][t], (1, 1)))
                 else:
                     the_sample[key].append(
                         tf.reshape(static_sem()[key](the_sample), (1, 1))
@@ -138,9 +197,7 @@ def sample_from_sem_hat(
         else:
             for key in dynamic_sem().keys():
                 if intervention is not None and intervention[key][t] is not None:
-                    the_sample[key].append(
-                        tf.reshape(intervention[key][t], (1, 1))
-                    )
+                    the_sample[key].append(tf.reshape(intervention[key][t], (1, 1)))
                 else:
                     the_sample[key].append(
                         tf.reshape(dynamic_sem()[key](t, the_sample), (1, 1))
@@ -177,7 +234,7 @@ def draw_samples_from_sem_hat(
 def draw_samples_from_sem_hat_dev(
     sem_hat: object,
     num_samples: int,
-    max_time_step: int,
+    temporal_index: int,
     intervention: dict = None,
     seed: int = None,
 ) -> OrderedDict:
@@ -187,23 +244,25 @@ def draw_samples_from_sem_hat_dev(
 
     sample = OrderedDict([(key, []) for key in sem_hat.static().keys()])
 
-    for t in range(max_time_step):
+    for t in range(temporal_index +1):
         for key in list(sem_hat.static().keys()):
             if t == 0:
-                if not intervention and not intervention[key][t]:
-                    sample[key] = tf.ones((num_samples, 1) * intervention[key][t])
+                if intervention is not None  and intervention[key][t] is not None:
+                    sample[key] = tf.ones((num_samples, 1)) * intervention[key][t]
                 else:
-                    sample[key] = sem_hat.static()[key](sample)
+                    sample[key] = sem_hat.static()[key](sample, num_samples)
             else:
-                if not intervention and not intervention[key][t]:
-                    sample[key] = tf.stack(
-                        sample[key],
-                        tf.ones((num_samples, 1) * intervention[key][t]),
+                if intervention is not None and intervention[key][t] is not None:
+                    # print(intervention[key][t])
+                    sample[key] = tf.concat(
+                        (sample[key],
+                        tf.ones((num_samples, 1)) * intervention[key][t]),
                         axis=1,
                     )
                 else:
-                    sample[key] = tf.stack(
-                        sample[key], sem_hat.dynamic()[key](t, sample), axis=1
+                    sample[key] = tf.concat(
+                        (sample[key],
+                        sem_hat.dynamic()[key](t, sample, num_samples)),
+                        axis=1,
                     )
-
     return sample

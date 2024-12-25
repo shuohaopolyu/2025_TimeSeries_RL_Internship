@@ -127,28 +127,31 @@ def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
     mean_obs = tf.reduce_mean(observation_data)
     std_obs = tf.math.reduce_std(observation_data)
 
-    def gaussian_variable(sample):
-        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample()
+    def gaussian_variable(sample: OrderedDict, e_num: int = 1):
+        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample((e_num, 1))
 
     return gaussian_variable
 
 
 def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
 
-    def gaussian_process(sample: OrderedDict):
+    def gaussian_process(sample: OrderedDict, e_num: int = 1):
         index_x = []
-        for parent in predecessors:
+        for i, parent in enumerate(predecessors):
             parent_name, parent_index = parent.split("_")
-            ipt_of_this_parent = sample[parent_name][int(parent_index)]
-            reshaped_parent_input = tf.reshape(ipt_of_this_parent, (1, 1))
-            index_x.append(reshaped_parent_input)
-        index_x_reshaped = tf.reshape(tf.convert_to_tensor(index_x), (1, -1))
-        assert len(index_x_reshaped.shape) == 2, "Variable index_x should be 2D tensor."
-        assert index_x_reshaped.shape[1] == len(
+            ipt_of_this_parent = sample[parent_name][:, int(parent_index)]
+            reshaped_parent_input = ipt_of_this_parent[:, tf.newaxis]
+            if i == 0:
+                index_x = reshaped_parent_input
+            else:
+                index_x = tf.concat([index_x, reshaped_parent_input], axis=1)
+
+        assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
+        assert index_x.shape[1] == len(
             predecessors
         ), "Variable index_x should have the same length as the predecessors."
         # sample from the marginal distribution of the Gaussian Process Regression Model
         # https://github.com/tensorflow/probability/issues/837
-        return gprm.get_marginal_distribution(index_x_reshaped).sample(1)
+        return (gprm.get_marginal_distribution(index_x).sample())[:, tf.newaxis]
 
     return gaussian_process
