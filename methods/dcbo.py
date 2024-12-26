@@ -129,8 +129,12 @@ class DynCausalBayesOpt:
         self, temporal_index: int
     ) -> tuple[tuple[str], list, float]:
         i_D_interven = self.D_interven[temporal_index]
+        print(i_D_interven)
         if len(i_D_interven) == 0:
-            return None, None, 0.0
+            if self.task == "min":
+                return None, None, float("inf")
+            elif self.task == "max":
+                return None, None, float("-inf")
         extreme_values = []
         for _, sub_dict in i_D_interven.items():
             if sub_dict is None:
