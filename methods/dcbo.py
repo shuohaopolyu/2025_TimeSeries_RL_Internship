@@ -71,6 +71,7 @@ class DynCausalBayesOpt:
 
     def run(self):
         """Run Dynamic Causal Bayesian Optimization"""
+        opt_history = [[] for _ in range(self.T)]
         for temporal_index in range(self.T):
             # Update the observational data
             self._update_observational_data(temporal_index)
@@ -97,18 +98,20 @@ class DynCausalBayesOpt:
                 self._intervene_and_augment(
                     temporal_index, suspected_es, suspected_candidate_point
                 )
+                # Update the optimal intervention history
+                self._update_opt_intervene_history(temporal_index)
+
+                opt_history[temporal_index].append(self.opt_intervene_history[temporal_index]["optimal_value"])
 
                 print("Temporal index:", temporal_index)
                 print("Trial:", trial)
                 print("Intervened exploration set:", suspected_es)
                 print("Intervention point:", suspected_candidate_point.numpy())
                 print("Target variable value:", self.D_interven[temporal_index][suspected_es][self.target_var][-1, 0].numpy())
-                # Update the optimal intervention history
-                self._update_opt_intervene_history(temporal_index)
                 print("Optimal value:", self.opt_intervene_history[temporal_index]["optimal_value"])
             
             print("Dynamic causal Bayesian optimization at time step {} is completed.".format(temporal_index))
-
+        return opt_history
     def _initialize_exploration_set(self) -> list[tuple[str]]:
         self.dyn_graph.temporal_index = 0
         mis = self.dyn_graph.minimal_intervene_set()
@@ -255,10 +258,10 @@ class DynCausalBayesOpt:
                 if node.split("_")[0] in self.self.full_opt_intervene_vars
             ]
 
-            def mean_fny_xiw(batch_x_py_values: tf.Tensor):
+            def mean_fny_xiw(x_py_values: tf.Tensor):
                 # x_py_values is a tensor of shape (batch_num, len(x_py))
                 # will return a tensor of shape (batch_num, num_monte_carlo, 1)
-                intervention = self._intervene_scheme(x_py, i_py, batch_x_py_values)
+                intervention = self._intervene_scheme(x_py, i_py, x_py_values)
                 for i, i_intervention in enumerate(intervention):
                     i_samples = draw_samples_from_sem_hat_dev(
                         self.sem_estimated,
@@ -279,9 +282,9 @@ class DynCausalBayesOpt:
                         )
                 return samples_mean_fny_xiw
 
-            def prior_mean(batch_x_py_values: tf.Tensor):
-                # print("batch_x_py_values", batch_x_py_values.shape)
-                samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
+            def prior_mean(x_py_values: tf.Tensor):
+                # print("x_py_values", x_py_values.shape)
+                samples_mean_fny_xiw = mean_fny_xiw(x_py_values)
                 # print("samples_mean_fny_xiw", samples_mean_fny_xiw.shape)
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
@@ -295,8 +298,8 @@ class DynCausalBayesOpt:
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
 
-            def prior_std(batch_x_py_values: tf.Tensor):
-                samples_mean_fny_xiw = mean_fny_xiw(batch_x_py_values)
+            def prior_std(x_py_values: tf.Tensor):
+                samples_mean_fny_xiw = mean_fny_xiw(x_py_values)
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
                     samples_fy_f_star_tile = tf.tile(
@@ -410,9 +413,6 @@ class DynCausalBayesOpt:
                 posterior_std_candidate_points = self.posterior_causal_gp[es][1](
                     tf.expand_dims(candidate_points, axis=0)
             )
-            # print(es)
-            # print(posterior_mean_candidate_points)
-            # print(posterior_std_candidate_points)
             if self.task == "min":
                 truncated_gaussian = tfp.distributions.TruncatedNormal(
                     posterior_mean_candidate_points - y_star,
