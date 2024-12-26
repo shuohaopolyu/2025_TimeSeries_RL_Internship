@@ -21,13 +21,13 @@ def label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
     Returns:
         tuple: observation data predecessors and target node
     """
-    node_name, node_index = node.split("_")
+    node_name, temporal_index = node.split("_")
     obs_data = []
     for parent in predecessors:
         parent_name, parent_index = parent.split("_")
         obs_data.append(D_obs[parent_name][:, int(parent_index)])
     obs_data_x = tf.stack(obs_data, axis=1)
-    obs_data_y = D_obs[node_name][:, int(node_index)]
+    obs_data_y = D_obs[node_name][:, int(temporal_index)]
     return obs_data_x, obs_data_y
 
 
@@ -53,23 +53,23 @@ def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) 
     fcns = {t: OrderedDict() for t in range(max_temporal_index + 1)}
 
     for node in sorted_nodes:
-        node_index = int(node.split("_")[1])
+        temporal_index = int(node.split("_")[1])
         node_name = node.split("_")[0]
-        if temporal_index is not None and node_index != temporal_index:
+        if temporal_index is not None and temporal_index != temporal_index:
             continue
         predecessors = list(the_graph.predecessors(node))
         if not predecessors:
-            obs_data = D_obs[node_name][:, node_index]
+            obs_data = D_obs[node_name][:, temporal_index]
             # simply consider these nodes follow a normal distribution
             # with the mean and std calculated from the observation data
             # practitioners can replace this with more sophisticated models
-            fcns[node_index][node_name] = build_gaussian_variable(obs_data)
+            fcns[temporal_index][node_name] = build_gaussian_variable(obs_data)
         else:
             obs_data_x, obs_data_y = label_pairs(D_obs, node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            fcns[node_index][node_name] = build_gaussian_process(gprm, predecessors)
+            fcns[temporal_index][node_name] = build_gaussian_process(gprm, predecessors)
     return fcns
 
 

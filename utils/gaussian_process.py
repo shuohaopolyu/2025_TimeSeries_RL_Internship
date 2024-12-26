@@ -96,7 +96,7 @@ def build_gprm(
             patience_counter += 1
 
         if patience_counter > patience:
-            print(f"Early stopping at step {step}")
+            # print(f"Early stopping at step {step}")
             is_early_stopping = True
             break
 

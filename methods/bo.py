@@ -27,6 +27,7 @@ class BayesOpt:
         self.T = len(self.dyn_graph.full_output_vars)
         self.cost_fcn = cost_fcn
         self.num_anchor_points = num_anchor_points
+        self.target_var = self.dyn_graph.full_output_vars[-1].split("_")[0]
 
     def run(self):
         """Run Bayesian Optimization"""
@@ -42,3 +43,23 @@ class BayesOpt:
                 self._observe(suspected_candidate)
 
                 self._update_opt_observation(temporal_index)
+
+    def _posterior_gp(self, temporal_index):
+        """Posterior Gaussian Process"""
+        pass
+
+    def _acqusition_function(self, temporal_index):
+        """Acquisition Function"""
+        pass
+
+    def _suspected_observation_this_trial(self):
+        """Suspected Observation This Trial"""
+        pass
+
+    def _observe(self, suspected_candidate):
+        """Observe"""
+        pass
+
+    def _update_opt_observation(self, temporal_index):
+        """Update Optimal Observation"""
+        pass

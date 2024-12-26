@@ -51,7 +51,7 @@ class DynCausalBayesOpt:
         self.task = task
         assert task in ["min", "max"], "Task should be either 'min' or 'max'."
         self.T = len(self.dyn_graph.full_output_vars)
-        self.D_interven = OrderedDict((t, {}) for t in range(self.T))
+        self.D_interven = OrderedDict((t, OrderedDict()) for t in range(self.T))
         self.D_interven[0] = D_intervene_ini
         self.opt_intervene_history = OrderedDict()
         self.full_opt_intervene_vars = []
@@ -81,11 +81,12 @@ class DynCausalBayesOpt:
             # initialise dynamic causal GP models
             self._prior_causal_gp(temporal_index)
 
+            print("Dynamic causal Bayesian optimization at time step {} is started.".format(temporal_index))
+
             # Initialize the exploration set
             for trial in range(self.num_trials):
                 # initialise the posterior causal GP models
                 self._posterior_causal_gp(temporal_index)
-
                 # Compute acquisition function for each exploration set
                 self._acquisition_function(temporal_index)
                 # Obtain the suspected optimal intervention based on the acquisition function
@@ -96,11 +97,12 @@ class DynCausalBayesOpt:
                 self._intervene_and_augment(
                     temporal_index, suspected_es, suspected_candidate_point
                 )
+
                 print("Temporal index:", temporal_index)
                 print("Trial:", trial)
                 print("Intervened exploration set:", suspected_es)
-                print("Intervention point:", suspected_candidate_point)
-                print("Target variable value:", self.D_interven[temporal_index][suspected_es][self.target_var][-1])
+                print("Intervention point:", suspected_candidate_point.numpy())
+                print("Target variable value:", self.D_interven[temporal_index][suspected_es][self.target_var][-1, 0].numpy())
                 # Update the optimal intervention history
                 self._update_opt_intervene_history(temporal_index)
                 print("Optimal value:", self.opt_intervene_history[temporal_index]["optimal_value"])
@@ -231,7 +233,7 @@ class DynCausalBayesOpt:
                 f_star = tf.constant(
                     [[self.opt_intervene_history[temporal_index - 1]["optimal_value"]]]
                 )
-                # compute the mean of fy(f_star)
+                # compute the mean and standard deviation of fy(f_star)
                 mean_fy_f_star = fy_fcn[0](f_star)
                 std_fy_f_star = fy_fcn[1](f_star)
                 # exclude the y_pt from the predecessor
@@ -394,7 +396,9 @@ class DynCausalBayesOpt:
             # print(tf.expand_dims(candidate_points, axis=0))
             self.D_acquisition[es][0] = candidate_points
             _, _, y_star = self._optimal_intervene_value(temporal_index)
+            # print(self.D_interven[temporal_index])
             if es not in self.D_interven[temporal_index]:
+                # print("es not in D_interven")
                 posterior_mean_candidate_points = (self.posterior_causal_gp[es][0](
                     candidate_points))[tf.newaxis, :]
                 posterior_std_candidate_points = (self.posterior_causal_gp[es][1](
