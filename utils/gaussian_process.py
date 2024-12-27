@@ -151,6 +151,7 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
         ), "Variable index_x should have the same length as the predecessors."
         # sample from the marginal distribution of the Gaussian Process Regression Model
         # https://github.com/tensorflow/probability/issues/837
-        return (gprm.get_marginal_distribution(index_x).sample())[:, tf.newaxis]
+        samples = (gprm.get_marginal_distribution(index_x).sample())[:, tf.newaxis]
+        return samples
 
     return gaussian_process

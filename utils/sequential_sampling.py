@@ -265,4 +265,5 @@ def draw_samples_from_sem_hat_dev(
                         sem_hat.dynamic()[key](t, sample, num_samples)),
                         axis=1,
                     )
+        # print(sample)
     return sample
