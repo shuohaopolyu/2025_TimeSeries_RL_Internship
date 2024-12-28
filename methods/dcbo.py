@@ -297,8 +297,6 @@ class DynCausalBayesOpt:
             the_graph, self.D_obs, self.target_var, temporal_index
         )
         for es in self.exploration_set:
-            # if es == ("Z",):
-            #     continue
             predecessor = predecessor_of_target.copy()
             # Initialize the prior mean and covariance functions for each exploration set
             if fy_fcn[0] is not None:
@@ -328,8 +326,12 @@ class DynCausalBayesOpt:
                 if node.split("_")[0] in self.self.full_opt_intervene_vars
             ]
 
-            def prior_mean(x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn):
-                samples_mean_fny_xiw = self._mean_fny_xiw(x_py_values, x_py, i_py, temporal_index, fny_fcn)
+            def prior_mean(
+                x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn
+            ):
+                samples_mean_fny_xiw = self._mean_fny_xiw(
+                    x_py_values, x_py, i_py, temporal_index, fny_fcn
+                )
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
                     samples_fy_f_star_tile = tf.tile(
@@ -342,8 +344,12 @@ class DynCausalBayesOpt:
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
 
-            def prior_std(x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn):
-                samples_mean_fny_xiw = self._mean_fny_xiw(x_py_values, x_py, i_py, temporal_index, fny_fcn)
+            def prior_std(
+                x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn
+            ):
+                samples_mean_fny_xiw = self._mean_fny_xiw(
+                    x_py_values, x_py, i_py, temporal_index, fny_fcn
+                )
                 # print("samples_mean_fny_xiw", samples_mean_fny_xiw[32, :, :])
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
