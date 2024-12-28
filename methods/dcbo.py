@@ -216,7 +216,6 @@ class DynCausalBayesOpt:
             predecessor_index = int(predecessor.split("_")[1])
             if predecessor_index == temporal_index:
                 ny_nodes.append(predecessor)
-        print("ny_nodes", ny_nodes)
         return label_pairs(samples, current_node, ny_nodes)[0]
 
     def _intervene_scheme(
@@ -257,7 +256,7 @@ class DynCausalBayesOpt:
         # x_py_values is a tensor of shape (batch_num, len(x_py))
         # will return a tensor of shape (batch_num, num_monte_carlo, 1)
         intervention = self._intervene_scheme(x_py, i_py, x_py_values, temporal_index)
-        print("x_py", x_py)
+        # print("x_py", x_py)
         for i, i_intervention in enumerate(intervention):
             i_samples = draw_samples_from_sem_hat_dev(
                 self.sem_estimated,
@@ -266,11 +265,12 @@ class DynCausalBayesOpt:
                 intervention=i_intervention,
                 seed=None,
             )
+            # print("i_intervention", i_intervention)
             self.dyn_graph.temporal_index = temporal_index
             the_graph = self.dyn_graph.graph.copy()
             # print("i_samples", i_samples)
             i_input_fny = self._input_fny(the_graph, i_samples, temporal_index)
-            print("i_input_fny", i_input_fny)
+            # print("i_input_fny", i_input_fny)
             i_samples_mean_fny_xiw = tf.expand_dims(
                 fny_fcn[0](i_input_fny)[:, tf.newaxis], axis=0
             )
@@ -297,6 +297,8 @@ class DynCausalBayesOpt:
             the_graph, self.D_obs, self.target_var, temporal_index
         )
         for es in self.exploration_set:
+            # if es == ("Z",):
+            #     continue
             predecessor = predecessor_of_target.copy()
             # Initialize the prior mean and covariance functions for each exploration set
             if fy_fcn[0] is not None:
@@ -315,9 +317,7 @@ class DynCausalBayesOpt:
             else:
                 samples_fy_f_star = None
 
-            x_py = [x + "_" + str(temporal_index) for x in es]
-            x_py = [node for node in x_py if node in predecessor]
-            print("x_py", x_py)
+            x_py = [(x + "_" + str(temporal_index)) for x in es]
             # get the subset of the predecessor that subscript is less than temporal_index
             previous_py = [
                 node for node in predecessor if int(node.split("_")[1]) < temporal_index
@@ -328,7 +328,7 @@ class DynCausalBayesOpt:
                 if node.split("_")[0] in self.self.full_opt_intervene_vars
             ]
 
-            def prior_mean(x_py_values: tf.Tensor):
+            def prior_mean(x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn):
                 samples_mean_fny_xiw = self._mean_fny_xiw(x_py_values, x_py, i_py, temporal_index, fny_fcn)
                 batch_num = samples_mean_fny_xiw.shape[0]
                 if fy_fcn[0] is not None:
@@ -342,7 +342,7 @@ class DynCausalBayesOpt:
                 else:
                     return tf.reduce_mean(samples_mean_fny_xiw, axis=[1, 2])
 
-            def prior_std(x_py_values: tf.Tensor):
+            def prior_std(x_py_values: tf.Tensor, x_py=x_py, i_py=i_py, fny_fcn=fny_fcn):
                 samples_mean_fny_xiw = self._mean_fny_xiw(x_py_values, x_py, i_py, temporal_index, fny_fcn)
                 # print("samples_mean_fny_xiw", samples_mean_fny_xiw[32, :, :])
                 batch_num = samples_mean_fny_xiw.shape[0]

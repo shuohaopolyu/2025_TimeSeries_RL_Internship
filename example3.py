@@ -19,15 +19,22 @@ dyn_graph = three_step_stat()
 sem_model = StationaryModel_dev()
 full_samples = OrderedDict([(key, []) for key in sem_model.static().keys()])
 num_samples = 20
-max_time_step = 2
+temporal_index = 2
+
 epsilon = OrderedDict(
     [
-        (key, tfd.Normal(0.0, 1.0).sample((num_samples, max_time_step)))
+        (key, tfd.Normal(0.0, 1.0).sample((num_samples, temporal_index+1)))
         for key in full_samples.keys()
     ]
 )
 
-D_obs = draw_samples_from_sem_dev(sem_model, num_samples, max_time_step, seed=1111)
+# epsilon_x1 = tfd.Normal(0.0, 1.0).sample((num_samples, 1))
+epsilon_x1 = tf.linspace(-5.0, 5.0, num_samples)[:, tf.newaxis]
+epsilon_x23 = tfd.Normal(0.0, 1.0).sample((num_samples, 2))
+epsilon["X"] = tf.concat([epsilon_x1, epsilon_x23], axis=1)
+
+
+D_obs = draw_samples_from_sem_dev(sem_model, num_samples, temporal_index, epsilon=epsilon)
 intervention_ini = {
     "X": [-3.6],
     "Z": [None],
@@ -52,7 +59,7 @@ num_trials = 20
 task = "min"
 cost_fn = equal_cost
 num_anchor_points = 100
-num_monte_carlo = 10
+num_monte_carlo = 100
 jitter = 1e-6
 dcbo = DynCausalBayesOpt(
     dyn_graph,
@@ -72,35 +79,12 @@ dcbo._update_observational_data(0)
 dcbo._update_sem_hat(0)
 dcbo._prior_causal_gp(0)
 
-z_mean_fcn, z_std_fcn = dcbo.prior_causal_gp[("Z",)]
 x_mean_fcn, x_std_fcn = dcbo.prior_causal_gp[("X",)]
-
-z_index = (tf.linspace(-5.0, 20.0, 100))[:, tf.newaxis]
 x_index = (tf.linspace(-5.0, 5.0, 100))[:, tf.newaxis]
-
-# z_mean = z_mean_fcn(z_index)
-# z_std = z_std_fcn(z_index)
-# print(z_std)
-# z_true = tf.cos(z_index) - tf.exp(-z_index / 20.0)
-
 x_mean = x_mean_fcn(x_index)
 x_std = x_std_fcn(x_index)
 x2z_true = tf.exp(-x_index)
 x_true = tf.cos(x2z_true) - tf.exp(-x2z_true / 20.0)
-
-
-# plt.plot(z_index.numpy(), z_mean.numpy())
-# plt.plot(z_index.numpy(), z_true.numpy(), color="k")
-# plt.scatter(D_obs["Z"][:, 0], D_obs["Y"][:, 0], color="r", marker="x")
-# plt.fill_between(
-#     z_index[:, 0].numpy(),
-#     z_mean.numpy() - 2 * z_std.numpy(),
-#     z_mean.numpy() + 2 * z_std.numpy(),
-#     alpha=0.4,
-#     color="k",
-# )
-# plt.show()
-
 plt.plot(x_index.numpy(), x_mean.numpy())
 plt.plot(x_index.numpy(), x_true.numpy(), color="k")
 plt.scatter(D_obs["X"][:, 0], D_obs["Y"][:, 0], color="r", marker="x")
@@ -108,6 +92,23 @@ plt.fill_between(
     x_index[:, 0].numpy(),
     x_mean.numpy() - 2 * x_std.numpy(),
     x_mean.numpy() + 2 * x_std.numpy(),
+    alpha=0.4,
+    color="k",
+)
+plt.show()
+
+z_mean_fcn, z_std_fcn = dcbo.prior_causal_gp[("Z",)]
+z_index = (tf.linspace(-5.0, 20.0, 100))[:, tf.newaxis]
+z_mean = z_mean_fcn(z_index)
+z_std = z_std_fcn(z_index)
+z_true = tf.cos(z_index) - tf.exp(-z_index / 20.0)
+plt.plot(z_index.numpy(), z_mean.numpy())
+plt.plot(z_index.numpy(), z_true.numpy(), color="k")
+plt.scatter(D_obs["Z"][:, 0], D_obs["Y"][:, 0], color="r", marker="x")
+plt.fill_between(
+    z_index[:, 0].numpy(),
+    z_mean.numpy() - 2 * z_std.numpy(),
+    z_mean.numpy() + 2 * z_std.numpy(),
     alpha=0.4,
     color="k",
 )
