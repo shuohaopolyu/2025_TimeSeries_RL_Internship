@@ -390,7 +390,7 @@ class DynCausalBayesOpt:
                     es_intervene_y,
                     mean_fn=self.prior_causal_gp[es][0],
                     causal_std_fn=self.prior_causal_gp[es][1],
-                    obs_noise_factor=0.0,
+                    obs_noise_factor=0.01,
                     amplitude_factor=(
                         self.causal_gpm_list[es].kernel.amplitude
                         if self.causal_gpm_list[es] is not None
@@ -401,13 +401,12 @@ class DynCausalBayesOpt:
                         if self.causal_gpm_list[es] is not None
                         else 1.0
                     ),
-                    max_training_step=10000,
                 )
 
-                def posterior_mean(x_py_values: tf.Tensor):
+                def posterior_mean(x_py_values: tf.Tensor, causal_gpm=causal_gpm):
                     return causal_gpm.get_marginal_distribution(x_py_values).mean()
 
-                def posterior_std(x_py_values: tf.Tensor):
+                def posterior_std(x_py_values: tf.Tensor, causal_gpm=causal_gpm):
                     return causal_gpm.get_marginal_distribution(x_py_values).stddev()
 
                 self.posterior_causal_gp[es] = (posterior_mean, posterior_std)
@@ -449,12 +448,10 @@ class DynCausalBayesOpt:
         for es in self.exploration_set:
             self.D_acquisition[es] = [None, None]
             candidate_points = self._intervention_points(es)
-            # print(tf.expand_dims(candidate_points, axis=0))
             self.D_acquisition[es][0] = candidate_points
             _, _, y_star = self._optimal_intervene_value(temporal_index)
             # print(self.D_interven[temporal_index])
             if es not in self.D_interven[temporal_index]:
-                # print("es not in D_interven")
                 posterior_mean_candidate_points = (
                     self.posterior_causal_gp[es][0](candidate_points)
                 )[tf.newaxis, :]
@@ -468,18 +465,21 @@ class DynCausalBayesOpt:
                 posterior_std_candidate_points = self.posterior_causal_gp[es][1](
                     tf.expand_dims(candidate_points, axis=0)
                 )
+            # print("es", es)
+            # print("candidate_points", candidate_points)
+            # print("posterior_mean_candidate_points", posterior_mean_candidate_points)
+            # print("posterior_std_candidate_points", posterior_std_candidate_points)
             _gaussians = tfp.distributions.Normal(
                 posterior_mean_candidate_points - y_star,
                 posterior_std_candidate_points,
             )
             _gaussians_cdf = _gaussians.log_cdf(0.0)
             if self.task == "min":
-                # print("min", _gaussians_cdf)
                 pass
             elif self.task == "max":
                 _gaussians_cdf = 0.0 - _gaussians_cdf
 
-            self.D_acquisition[es][1] = _gaussians_cdf / equal_cost(es)
+            self.D_acquisition[es][1] = _gaussians_cdf / self.cost_fcn(es)
         return self.D_acquisition
 
     def _suspected_intervention_this_trial(self) -> tuple[list[str], tf.Tensor]:

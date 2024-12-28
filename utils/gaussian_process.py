@@ -12,7 +12,7 @@ def build_gprm(
     amplitude_factor: float = 1.0,
     length_scale_factor: float = 1.0,
     obs_noise_factor: float = 0.1,
-    max_training_step: int = 10000,
+    max_training_step: int = 50000,
     learning_rate: float = 5e-4,
     patience: int = 20,
     mean_fn=None,
@@ -35,12 +35,11 @@ def build_gprm(
         bijector=tfp.bijectors.Exp(),
         name="length_scale",
     )
-    if observation_noise_variance is None:
-        observation_noise_variance = tfp.util.TransformedVariable(
-            initial_value=obs_noise_factor,
-            bijector=tfp.bijectors.Exp(),
-            name="observation_noise_variance",
-        )
+    observation_noise_variance = tfp.util.TransformedVariable(
+        initial_value=obs_noise_factor,
+        bijector=tfp.bijectors.Exp(),
+        name="observation_noise_variance",
+    )
 
     if causal_std_fn is None:
         kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
@@ -50,9 +49,10 @@ def build_gprm(
         kernel = CausalKernel(
             causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale
         )
-        observation_noise_variance = (
-            0.0  # CausalKernel does not have explicit noise defined.
-        )
+        # observation_noise_variance = (
+        #     0.0  # CausalKernel does not have explicit noise defined.
+        # )
+
         assert (
             mean_fn is not None
         ), "Please provide a mean function for the CausalKernel."

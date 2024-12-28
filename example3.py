@@ -45,7 +45,7 @@ D_intervene_ini_x = draw_samples_from_sem_dev(
 )
 intervention_ini = {
     "X": [None],
-    "Z": [7.5],
+    "Z": [-3.1],
     "Y": [None],
 }
 D_intervene_ini_z = draw_samples_from_sem_dev(
@@ -58,7 +58,7 @@ intervention_domain = OrderedDict([("X", [-5.0, 5.0]), ("Z", [-5.0, 20.0])])
 num_trials = 20
 task = "min"
 cost_fn = equal_cost
-num_anchor_points = 100
+num_anchor_points = 10
 num_monte_carlo = 100
 jitter = 1e-6
 dcbo = DynCausalBayesOpt(
@@ -114,3 +114,8 @@ plt.fill_between(
 )
 plt.show()
 
+dcbo._posterior_causal_gp(0)
+
+
+dcbo._acquisition_function(0)
+print(dcbo.D_acquisition)
