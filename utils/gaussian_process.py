@@ -12,15 +12,14 @@ def build_gprm(
     amplitude_factor: float = 1.0,
     length_scale_factor: float = 1.0,
     obs_noise_factor: float = 0.1,
-    max_training_step: int = 50000,
-    learning_rate: float = 5e-4,
+    max_training_step: int = 20000,
+    learning_rate: float = 2e-4,
     patience: int = 20,
     mean_fn=None,
-    observation_noise_variance=None,
     causal_std_fn=None,
     debug_mode=False,
 ):
-    assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
+    # assert len(index_x.shape) == 2, "Variable index_x should be 2D tensor."
     assert len(x.shape) == 2, "Variable x should be 2D tensor."
     assert len(y.shape) == 1, "Variable y should be 1D tensor."
 
@@ -106,12 +105,12 @@ def build_gprm(
             print("Warning: optimization might not converge")
 
     gprm = tfp.distributions.GaussianProcessRegressionModel(
-        kernel=kernel,
+        kernel=gp.kernel,
         index_points=index_x,
         observation_index_points=x,
         observations=y,
-        observation_noise_variance=observation_noise_variance,
-        mean_fn=mean_fn,
+        observation_noise_variance=gp.observation_noise_variance,
+        mean_fn=gp.mean_fn,
     )
 
     return gprm, losses, is_early_stopping

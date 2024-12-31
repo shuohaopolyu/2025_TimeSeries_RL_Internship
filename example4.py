@@ -14,21 +14,21 @@ import tensorflow_probability as tfp
 from collections import OrderedDict
 
 tfd = tfp.distributions
-tf.random.set_seed(1)
+# tf.random.set_seed(1)
 
 sem_model = StationaryModel_dev()
-num_samples = 100
+num_samples = 50
 temporal_index = 2
 full_samples = OrderedDict([(key, []) for key in sem_model.static().keys()])
 epsilon = OrderedDict(
     [
-        (key, tfd.Normal(0.0, 0.3).sample((num_samples, temporal_index + 1)))
+        (key, tfd.Normal(0.0, 0.1).sample((num_samples, temporal_index + 1)))
         for key in full_samples.keys()
     ]
 )
 
-epsilon_x1 = tf.linspace(-3.0, 8.0, num_samples)[:, tf.newaxis]
-epsilon_x23 = tfd.Normal(0.0, 0.3).sample((num_samples, 2))
+epsilon_x1 = tf.linspace(-3.0, 5.0, num_samples)[:, tf.newaxis]
+epsilon_x23 = tfd.Normal(0.0, 0.1).sample((num_samples, 2))
 epsilon["X"] = tf.concat([epsilon_x1, epsilon_x23], axis=1)
 D_obs = draw_samples_from_sem_dev(
     sem_model, num_samples, temporal_index, epsilon=epsilon
@@ -78,7 +78,7 @@ num_trials = 15
 task = "min"
 cost_fn = equal_cost
 num_anchor_points = 100
-num_monte_carlo = 100
+num_monte_carlo = 50
 jitter = 1e-6
 dcbo = DynCausalBayesOpt(
     dyn_graph,
@@ -97,46 +97,28 @@ dcbo = DynCausalBayesOpt(
 opt_history = [[] for _ in range(dcbo.T)]
 suspected_es = None
 
-dcbo._update_observational_data(0)
-dcbo._update_sem_hat(0)
-dcbo._prior_causal_gp(0)
-dcbo._posterior_causal_gp(0)
+dcbo._update_observational_data(1)
+dcbo._update_sem_hat(1)
+dcbo.opt_intervene_history[0] = OrderedDict()
+dcbo.opt_intervene_history[0]["decision_vars"] = (("Z",), [tf.constant(-3.2)])
+dcbo.opt_intervene_history[0]["optimal_value"] = -2.1
+priors = dcbo._prior_causal_gp(1)
 
 candidate_points = tf.linspace(-3.0, 5.0, 100)[:, tf.newaxis]
-_, _, y_star = dcbo._optimal_intervene_value(0)
 
+x_prior_mean, x_prior_std = priors[("X",)]
 
-posterior_mean_candidate_points = dcbo.posterior_causal_gp[("X",)][0]()
+pred_mean = x_prior_mean(candidate_points)
+pred_std = x_prior_std(candidate_points)
 
-posterior_std_candidate_points = dcbo.posterior_causal_gp[("X",)][1]()
-
-# print(posterior_mean_candidate_points)
-# print(posterior_std_candidate_points)
-
-plt.plot(dcbo.candidate_points_dict[("X",)][:, 0], posterior_mean_candidate_points)
-plt.scatter(D_intervene_ini_x["X"][:, 0], D_intervene_ini_x["Y"][:, 0], color="red")
+plt.plot(candidate_points, pred_mean, label="prior mean")
 plt.fill_between(
-    dcbo.candidate_points_dict[("X",)][:, 0],
-    posterior_mean_candidate_points - 2 * posterior_std_candidate_points,
-    posterior_mean_candidate_points + 2 * posterior_std_candidate_points,
+    tf.squeeze(candidate_points),
+    tf.squeeze(pred_mean - 2 * pred_std),
+    tf.squeeze(pred_mean + 2 * pred_std),
     alpha=0.2,
+    label="prior std",
 )
 plt.show()
 
 
-candidate_points = tf.linspace(-3.0, 20.0, 100)[:, tf.newaxis]
-_, _, y_star = dcbo._optimal_intervene_value(0)
-
-posterior_mean_candidate_points = dcbo.posterior_causal_gp[("Z",)][0]()
-
-posterior_std_candidate_points = dcbo.posterior_causal_gp[("Z",)][1]()
-
-plt.plot(dcbo.candidate_points_dict[("Z",)][:, 0], posterior_mean_candidate_points)
-plt.fill_between(
-    dcbo.candidate_points_dict[("Z",)][:, 0],
-    posterior_mean_candidate_points - 2 * posterior_std_candidate_points,
-    posterior_mean_candidate_points + 2 * posterior_std_candidate_points,
-    alpha=0.2,
-)
-plt.scatter(D_intervene_ini_z["Z"][0, 0], D_intervene_ini_z["Y"][0, 0], color="red")
-plt.show()

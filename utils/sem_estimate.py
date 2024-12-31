@@ -7,6 +7,7 @@ from utils.gaussian_process import (
     build_gaussian_process,
 )
 import networkx as nx
+import matplotlib.pyplot as plt
 
 
 def label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
@@ -126,33 +127,50 @@ def fy_and_fny(
                 node.split("_")[0] + "_" + str(int(node.split("_")[1]) + 1)
                 for node in y_nodes
             ]
-            obs_data_x, obs_data_y = label_pairs(D_obs, current_node, y_nodes_current)
+            # print(current_node, y_nodes_current)
+            obs_data_x_fy, obs_data_y_fy = label_pairs(D_obs, current_node, y_nodes_current)
+            # obs_data_y_fy = obs_data_y_fy + 1e-4 * tf.random.normal(obs_data_y_fy.shape)
             index_ini = tf.ones((1, len(y_nodes_current)))
             # build the Gaussian Process Regression Model
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            mean_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).mean()
-            )
-            std_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).stddev()
-            )
-            fy_fcns[t] = [mean_fcn, std_fcn]
+            gprm_fy, _, _ = build_gprm(index_x=index_ini, x=obs_data_x_fy, y=obs_data_y_fy, obs_noise_factor=1e-4)
+            def mean_fcn_fy(new_index, gprm_fy=gprm_fy):
+                return gprm_fy.get_marginal_distribution(new_index).mean()
+            
+            def std_fcn_fy(new_index, gprm_fy=gprm_fy):
+                return gprm_fy.get_marginal_distribution(new_index).stddev()
+            
+            fy_fcns[t] = [mean_fcn_fy, std_fcn_fy]
+
 
             # build the emission function
             obs_data_x, obs_data_y = label_pairs(D_obs, current_node, ny_nodes)
             obs_data_x0, _ = label_pairs(D_obs, current_node, y_nodes)
             fy_pred = fy_fcns[t][0](obs_data_x0)
             obs_data_fny = obs_data_y - fy_pred
-
             index_ini = tf.ones((1, len(ny_nodes)))
+
+            sort_idx = tf.argsort(obs_data_x, axis=0)
+            plt_obs_x = tf.squeeze(tf.gather(obs_data_x, sort_idx, axis=0), axis=-1)
+            plt_obs_y = tf.squeeze(tf.gather(obs_data_fny, sort_idx, axis=0))
+            plt.plot(plt_obs_x, plt_obs_y, "o")
+
             # build the Gaussian Process Regression Model
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_fny)
-            mean_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).mean()
+            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_fny, obs_noise_factor=1e-2)
+            def mean_fcn(new_index, gprm=gprm):
+                return gprm.get_marginal_distribution(new_index).mean()
+            
+            def std_fcn(new_index, gprm=gprm):
+                return gprm.get_marginal_distribution(new_index).stddev()
+            
+            plt.plot(plt_obs_x, mean_fcn(plt_obs_x), "r")
+            plt.fill_between(
+                tf.squeeze(plt_obs_x),
+                tf.squeeze(mean_fcn(plt_obs_x) - 2 * std_fcn(plt_obs_x)),
+                tf.squeeze(mean_fcn(plt_obs_x) + 2 * std_fcn(plt_obs_x)),
+                alpha=0.2,
+                color="k",
             )
-            std_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).stddev()
-            )
+            plt.show()
             fny_fcns[t] = [mean_fcn, std_fcn]
 
         else:
@@ -163,12 +181,17 @@ def fy_and_fny(
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
             gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
-            mean_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).mean()
-            )
-            std_fcn = lambda new_index: tf.squeeze(
-                gprm.get_marginal_distribution(new_index).stddev()
-            )
+            def mean_fcn(new_index, gprm=gprm):
+                return gprm.get_marginal_distribution(new_index).mean()
+            
+            def std_fcn(new_index, gprm=gprm):
+                return gprm.get_marginal_distribution(new_index).stddev()
+            # mean_fcn = lambda new_index: tf.squeeze(
+            #     gprm.get_marginal_distribution(new_index).mean()
+            # )
+            # std_fcn = lambda new_index: tf.squeeze(
+            #     gprm.get_marginal_distribution(new_index).stddev()
+            # )
             fny_fcns[t] = [mean_fcn, std_fcn]
 
             fy_fcns[t] = [None, None]
