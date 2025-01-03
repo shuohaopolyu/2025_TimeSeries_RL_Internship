@@ -127,7 +127,7 @@ def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
     std_obs = tf.math.reduce_std(observation_data)
 
     def gaussian_variable(sample: OrderedDict, e_num: int = 1):
-        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample((e_num, 1))
+        return tfp.distributions.Normal(loc=mean_obs, scale=std_obs).sample((e_num,))
 
     return gaussian_variable
 
@@ -150,7 +150,7 @@ def build_gaussian_process(gprm, predecessors: list[str]) -> callable:
         ), "Variable index_x should have the same length as the predecessors."
         # sample from the marginal distribution of the Gaussian Process Regression Model
         # https://github.com/tensorflow/probability/issues/837
-        samples = (gprm.get_marginal_distribution(index_x).sample())[:, tf.newaxis]
+        samples = gprm.get_marginal_distribution(index_x).sample()
         return samples
 
     return gaussian_process

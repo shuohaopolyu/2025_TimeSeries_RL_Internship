@@ -310,7 +310,7 @@ class DynCausalBayesOpt:
             self.dyn_graph.temporal_index = temporal_index
             the_graph = self.dyn_graph.graph.copy()
             i_input_fny = self._input_fny(the_graph, i_samples, temporal_index)
-            print("i_samples", i_samples)
+            # print("i_samples", i_samples)
             i_samples_mean_fny_xiw = fny_fcn[0](i_input_fny)[tf.newaxis, :]
             i_samples_std_fny_xiw = fny_fcn[1](i_input_fny)[tf.newaxis, :]
             # print("i_samples_mean_fny_xiw", i_samples_mean_fny_xiw)
@@ -384,8 +384,8 @@ class DynCausalBayesOpt:
                     samples_fy_f_star_tile = tf.tile(
                         samples_fy_f_star, [e_num, 1]
                     )
-                    print("samples_fy_f_star_tile", samples_fy_f_star_tile)
-                    print("samples_mean_fny_xiw", samples_mean_fny_xiw)
+                    # print("samples_fy_f_star_tile", samples_fy_f_star_tile)
+                    # print("samples_mean_fny_xiw", samples_mean_fny_xiw)
                     mean_val = tf.reduce_mean(
                         samples_mean_fny_xiw + samples_fy_f_star_tile, axis=[1]
                     )
@@ -513,7 +513,7 @@ class DynCausalBayesOpt:
                         marker="x",
                     )
 
-            axs[es_idx].title("Posterior of the causal GP for exploration set {}".format(es))
+            axs[es_idx].set_title("Posterior of the causal GP for exploration set {}".format(es))
             if temporal_index == 0:
                 axs[es_idx].set_ylim(-5,5)
             elif temporal_index == 1:
