@@ -507,8 +507,8 @@ class DynCausalBayesOpt:
             if temporal_index in self.D_interven:
                 if es in self.D_interven[temporal_index]:
                     axs[es_idx].scatter(
-                        self.D_interven[temporal_index][es][es[0]][:, temporal_index],
-                        self.D_interven[temporal_index][es][self.target_var][:, temporal_index],
+                        self.D_interven[temporal_index][es][es[0]][:-1, temporal_index],
+                        self.D_interven[temporal_index][es][self.target_var][:-1, temporal_index],
                         color="red",
                         marker="x",
                     )
@@ -517,9 +517,9 @@ class DynCausalBayesOpt:
             if temporal_index == 0:
                 axs[es_idx].set_ylim(-5,5)
             elif temporal_index == 1:
-                axs[es_idx].set_ylim(-7,7)
+                axs[es_idx].set_ylim(-7,4)
             elif temporal_index == 2:
-                axs[es_idx].set_ylim(-10,10)
+                axs[es_idx].set_ylim(-10,4)
 
             axs[es_idx].set_xlim(
                 self.intervention_domain[es[0]][0], self.intervention_domain[es[0]][1]

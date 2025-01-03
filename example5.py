@@ -22,13 +22,13 @@ temporal_index = 2
 full_samples = OrderedDict([(key, []) for key in sem_model.static().keys()])
 epsilon = OrderedDict(
     [
-        (key, tfd.Normal(0.0, 0.3).sample((num_samples, temporal_index + 1)))
+        (key, tfd.Normal(0.0, 1.0).sample((num_samples, temporal_index + 1)))
         for key in full_samples.keys()
     ]
 )
 
 epsilon_x1 = tf.linspace(-3.0, 8.0, num_samples)[:, tf.newaxis]
-epsilon_x23 = tfd.Normal(0.0, 0.3).sample((num_samples, 2))
+epsilon_x23 = tfd.Normal(0.0, 1.0).sample((num_samples, 2))
 epsilon["X"] = tf.concat([epsilon_x1, epsilon_x23], axis=1)
 D_obs = draw_samples_from_sem_dev(
     sem_model, num_samples, temporal_index, epsilon=epsilon
@@ -147,9 +147,9 @@ plt.fill_between(
 )
 plt.legend(fontsize=8, loc="upper right", ncol=3)
 plt.xlim(-5, 20)
-plt.ylim(-3, 3)
+# plt.ylim(-3, 3)
 plt.xticks(tf.linspace(-5, 20, 6))
-plt.yticks(tf.linspace(-3, 3, 7))
+# plt.yticks(tf.linspace(-3, 3, 7))
 plt.xlabel("$Z_0$", fontsize=8)
 plt.ylabel("$Y_0$", fontsize=8)
 plt.tick_params(axis='both', direction='in', labelsize=8)
