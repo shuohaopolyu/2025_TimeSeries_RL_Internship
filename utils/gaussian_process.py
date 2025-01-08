@@ -42,11 +42,11 @@ def build_gprm(
 
     if causal_std_fn is None:
         kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-            amplitude=amplitude, length_scale=length_scale, feature_ndims=x.shape[1]
+            amplitude=amplitude, length_scale=length_scale
         )
     else:
         kernel = CausalKernel(
-            causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale, feature_ndims=x.shape[1]
+            causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale
         )
 
         assert (
@@ -116,7 +116,7 @@ def build_gprm(
 def build_gaussian_variable(observation_data: tf.Tensor) -> callable:
     assert (
         len(observation_data.shape) == 1
-    ), "Variable observation_data should be 1D tensor."
+    ), observation_data.shape
     assert (
         observation_data.shape[0] > 1
     ), "Variable observation_data should have more than 1 element."

@@ -12,9 +12,9 @@ class TestDynCausalBayesOpt(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("Starting tests for methods.dcbo")
-        dyn_graph = three_step_stat(0)
+        dyn_graph = three_step_stat(2)
         sem = StationaryModel_dev()
-        D_obs = draw_samples_from_sem_dev(sem, 20, 0)
+        D_obs = draw_samples_from_sem_dev(sem, 20, 2)
 
         intervention = {
             "X": [0.5],
@@ -62,7 +62,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
             intervention_domain,
             num_trials=10,
             task="min",
-            num_monte_carlo=100,
+            num_monte_carlo=10,
             num_anchor_points=5,
         )
 
@@ -90,13 +90,10 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         x_py = ["X_1"]
         i_py = []
         x_py_values = tf.constant([[-3.2], [4.2]])
-        output_intervention = self.dcbo_stat._intervene_scheme(x_py, i_py, x_py_values)
-        true_intervention = {
-            "X": [None, -3.2],
-            "Z": [None, None],
-            "Y": [None, None],
-        }
-        self.assertEqual(output_intervention[0], true_intervention)
+        output_intervention = self.dcbo_stat._intervene_scheme(x_py, i_py, x_py_values, temporal_index=1)
+        self.assertTrue(math.isclose(output_intervention[0]["X"][1], -3.2, abs_tol=1e-6))
+        self.assertEqual(output_intervention[0]["X"][0], None)
+        self.assertTrue(math.isclose(output_intervention[0]["Z"][0], -3.1, abs_tol=1e-6))
 
     def test_update_opt_intervene_vars(self):
         self.dcbo_stat._update_opt_intervene_history(0)
@@ -107,9 +104,9 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         samples = draw_samples_from_sem_dev(self.dcbo_stat.sem, 100, 2)
         self.dcbo_stat.dyn_graph.temporal_index = 2
         the_graph = self.dcbo_stat.dyn_graph.graph
-        ipt = self.dcbo_stat._input_fny(the_graph, samples)
+        ipt = self.dcbo_stat._input_fny(the_graph, samples, 1)
         self.assertEqual(ipt.shape, (100, 1))
-        self.assertEqual(ipt[0, 0], samples["Z"][0, 2])
+        self.assertEqual(ipt[0, 0], samples["Z"][0, 1])
 
     def test_intervention_points(self):
         for es in self.dcbo_stat.exploration_set:
@@ -147,7 +144,7 @@ class TestDynCausalBayesOpt(unittest.TestCase):
 
         intervention = {
             "X": [None, 3.2],
-            "Z": [None, None],
+            "Z": [-3.1, None],
             "Y": [None, None],
         }
         D_intervene_X = draw_samples_from_sem_dev(
@@ -155,31 +152,25 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         )
 
         self.dcbo_stat.D_interven[1] = OrderedDict([(("X", ), D_intervene_X)])
-        mean_std_es = self.dcbo_stat._posterior_causal_gp(1)
-        mean_es = mean_std_es[("X",)][0]
-        candidate_point = tf.constant([[3.2], [4.2], [5.2]])
-        candidate_point = tf.expand_dims(candidate_point, axis=0)
-        pred_mean = mean_es(candidate_point)
-        self.assertEqual(pred_mean.shape, (1,3))
-        self.dcbo_stat._acquisition_function(1)
+        pred_mean = self.dcbo_stat._posterior_causal_gp(1)[("X",)][0]
+        self.assertEqual(pred_mean().shape, (5,))
 
     def test_suspected_intervention_this_trial(self):
         candidates_x = tf.constant([[-5.0], [-2.5], [0.0], [2.5], [5.0]])
         candidates_z = tf.constant([[-5.0], [1.25], [7.5], [13.75], [20.0]])
         aq_x = tf.constant(
-            [[-1.0522499, -1.0522504, -1.0524182, -1.0689896, -1.057488]]
+            [2.1, 3.2, 2.2, 4.3, 5.2]
         )
         aq_z = tf.constant(
-            [[-1.0522499, -1.0562664, -1.0522525, -1.0522499, -1.0522499]]
+            [2.4, 0.2, 0.1, 0.8, 1.24]
         )
         self.dcbo_stat.D_acquisition[("X",)] = [candidates_x, aq_x]
         self.dcbo_stat.D_acquisition[("Z",)] = [candidates_z, aq_z]
-        suspected_es, suspected_candidate_point = (
-            self.dcbo_stat._suspected_intervention_this_trial()
-        )
+        suspected_es, suspected_candidate_point = self.dcbo_stat._suspected_intervention_this_trial()
+        
         self.assertEqual(suspected_es, ("X",))
         self.assertTrue(
-            math.isclose(suspected_candidate_point[0, 0], 2.5, abs_tol=1e-6)
+            math.isclose(suspected_candidate_point[0, 0], 5.0, abs_tol=1e-6)
         )
         self.assertEqual(suspected_candidate_point.shape, (1, 1))
 

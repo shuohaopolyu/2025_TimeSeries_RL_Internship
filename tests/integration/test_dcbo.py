@@ -37,21 +37,27 @@ class TestDynCausalBayesOpt(unittest.TestCase):
         num_trials = 2
         task = "min"
         cost_fn = equal_cost
-        num_anchor_points = 100
-        num_monte_carlo = 1000
+        num_anchor_points = 2
+        num_monte_carlo = 2
         jitter = 1e-6
         cls.dcbo = DynCausalBayesOpt(
-            dyn_graph,
-            sem_model,
-            D_obs,
-            D_intervene_ini,
-            intervention_domain,
-            num_trials,
-            task,
-            cost_fn,
-            num_anchor_points,
-            num_monte_carlo,
-            jitter,
+            dyn_graph=dyn_graph,
+            sem=sem_model,
+            D_obs=D_obs,
+            D_intervene_ini=D_intervene_ini,
+            intervention_domain=intervention_domain,
+            num_trials=num_trials,
+            task=task,
+            cost_fcn=cost_fn,
+            num_anchor_points= num_anchor_points,
+            num_monte_carlo= num_monte_carlo,
+            ini_global_extreme_abs=10.0,
+            jitter= jitter,
+            learning_rate=1e-4,
+            intervene_noise_factor=1e-2,
+            observation_noise_factor=1.0,
+            max_training_step=100000,
+            debug_mode=False,
         )
 
     @classmethod

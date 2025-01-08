@@ -6,9 +6,7 @@ from causal_graph.dynamic_graph import DynCausalGraph
 from causal_graph.example_dyn_graphs import three_step_stat
 
 from utils.sequential_sampling import (
-    draw_samples_from_sem,
     draw_samples_from_sem_dev,
-    draw_samples_from_sem_hat,
     draw_samples_from_sem_hat_dev,
 )
 from sem.stationary import StationaryModel, StationaryModel_dev
@@ -20,7 +18,8 @@ class TestSemEstimate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("Starting tests for utils.sem_estimate")
-        cls.tested_graph = three_step_stat(1)
+        cls.tested_graph = three_step_stat()
+        cls.tested_graph.temporal_index = 1
         num_samples = 20
         cls.sem = StationaryModel_dev()
         x_eps_0 = tfp.distributions.Normal(0.0, 1.0).sample((num_samples, 1))
@@ -34,7 +33,7 @@ class TestSemEstimate(unittest.TestCase):
             ]
         )
         cls.D_obs = draw_samples_from_sem_dev(cls.sem, num_samples, 1, epsilon=epsilon)
-        cls.fcns_full = fcns4sem(cls.tested_graph.graph, cls.D_obs)
+        cls.fcns_full = fcns4sem(cls.tested_graph.graph, cls.D_obs, debug_mode=False)
         cls.sem_estimated = sem_hat(cls.fcns_full)()
         print("Finished setting up tests for utils.sem_estimate")
 
@@ -47,9 +46,9 @@ class TestSemEstimate(unittest.TestCase):
         self.assertEqual(len(self.fcns_full[0]), 3)
         self.assertEqual(self.fcns_full[1].keys(), {"X", "Z", "Y"})
         self.assertIsInstance(self.fcns_full[0]["X"](0), tf.Tensor)
-
-        fcns = fcns4sem(self.tested_graph.graph, self.D_obs, temporal_index=1)
+        fcns = fcns4sem(self.tested_graph.graph, self.D_obs, temporal_index=1, debug_mode=False)
         self.assertEqual(len(fcns), 2)
+        print(fcns[0])
         self.assertEqual(len(fcns[0]), 0)
         self.assertEqual(len(fcns[1]), 3)
 

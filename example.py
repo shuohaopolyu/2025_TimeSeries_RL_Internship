@@ -12,7 +12,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from collections import OrderedDict
 tfd = tfp.distributions
-tf.random.set_seed(1)
 
 sem_model = StationaryModel_dev()
 num_samples = 100
@@ -58,7 +57,7 @@ dcbo = DynCausalBayesOpt(
     D_obs=D_obs,
     D_intervene_ini=D_intervene_ini,
     intervention_domain=intervention_domain,
-    num_trials=20,
+    num_trials=10,
     task="min",
     cost_fcn=equal_cost,
     num_anchor_points= 100,
@@ -67,9 +66,9 @@ dcbo = DynCausalBayesOpt(
     jitter= 1e-6,
     learning_rate=1e-4,
     intervene_noise_factor=1e-2,
-    observation_noise_factor=0.1,
+    observation_noise_factor=1.0,
     max_training_step=100000,
-    debug_mode=True,
+    debug_mode=False,
 )
 
 opt_history = dcbo.run()

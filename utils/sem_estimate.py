@@ -46,19 +46,22 @@ def plot_gprm_results(gprm, obs_data_x, obs_data_y, const=0.1):
 
     mean = gprm.get_marginal_distribution(index_new).mean()
     std = gprm.get_marginal_distribution(index_new).stddev()
-    plt.figure()
-    plt.plot(obs_data_x, obs_data_y, "ro", label="Observation Data")
-    plt.plot(index_new, mean, "b-", label="Mean")
-    plt.fill_between(
-        index_new[:, 0],
-        mean - 2 * std,
-        mean + 2 * std,
-        color="b",
-        alpha=0.2,
-        label="95% Confidence Interval",
-    )
-    plt.legend()
-    plt.show()
+    if obs_data_x.shape[1] == 1:
+        plt.figure()
+        plt.plot(obs_data_x, obs_data_y, "ro", label="Observation Data")
+        plt.plot(index_new, mean, "b-", label="Mean")
+        plt.fill_between(
+            index_new[:, 0],
+            mean - 2 * std,
+            mean + 2 * std,
+            color="b",
+            alpha=0.2,
+            label="95% Confidence Interval",
+        )
+        plt.legend()
+        plt.show()
+    else:
+        print("Warning: The plot is not available for more than one input variable.")
 
 def fcns4sem(
     the_graph: object, D_obs: OrderedDict, temporal_index: int = None, **gprm_kwargs
@@ -92,17 +95,17 @@ def fcns4sem(
     intervention_domain = gprm_kwargs.get("intervention_domain", None)
 
     for node in sorted_nodes:
-        temporal_index = int(node.split("_")[1])
+        temporal_index_node = int(node.split("_")[1])
         node_name = node.split("_")[0]
-        if temporal_index is not None and temporal_index != temporal_index:
+        if temporal_index is not None and temporal_index_node != temporal_index:
             continue
         predecessors = list(the_graph.predecessors(node))
         if not predecessors:
-            obs_data = D_obs[node_name][:, temporal_index]
+            obs_data = D_obs[node_name][:, temporal_index_node]
             # simply consider these nodes follow a normal distribution
             # with the mean and std calculated from the observation data
             # practitioners can replace this with more sophisticated models
-            fcns[temporal_index][node_name] = build_gaussian_variable(obs_data)
+            fcns[temporal_index_node][node_name] = build_gaussian_variable(obs_data)
         else:
             obs_data_x, obs_data_y = label_pairs(D_obs, node, predecessors)
             if intervention_domain is not None:
@@ -120,7 +123,7 @@ def fcns4sem(
             )
             if debug_mode:
                 plot_gprm_results(gprm, obs_data_x, obs_data_y)
-            fcns[temporal_index][node_name] = build_gaussian_process(gprm, predecessors)
+            fcns[temporal_index_node][node_name] = build_gaussian_process(gprm, predecessors)
     return fcns
 
 

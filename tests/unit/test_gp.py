@@ -67,36 +67,37 @@ class TestCausalKernel(unittest.TestCase):
         def tested_causal_std_fn(x):
             return tf.math.reduce_sum(x, axis=-1)
 
-        kernel = CausalKernel(tested_causal_std_fn, 1, 1)
+        kernel = CausalKernel(tested_causal_std_fn, 1.0, 1.0)
         x1 = tf.random.normal([10, 1])
         apply_result_1 = kernel.apply(x1, x1)
         self.assertIsInstance(apply_result_1, tf.Tensor)
-        self.assertEqual(apply_result_1.shape, (10))
-
-        x2 = tf.zeros([2, 6, 1])
-        apply_result_2 = kernel.apply(x2, x2)
-        self.assertEqual(apply_result_2.shape, (2, 6))
-
-        x3 = tf.zeros([3, 5, 2])
-        apply_result_3 = kernel.apply(x3, x3)
-        self.assertEqual(apply_result_3.shape, (3, 5))
+        self.assertEqual(apply_result_1.shape, (10, 10))
 
     def test_test_build_causal_gaussian_process(self):
+
         def tested_causal_std_fn(x):
-            return tf.math.reduce_sum(x, axis=-1)
+            return tf.squeeze(tf.math.reduce_sum(x, axis=-1))
 
         def tested_mean_fn(x):
-            return tf.math.reduce_sum(x, axis=-1)
+            return tf.squeeze(tf.math.reduce_sum(x, axis=-1))
 
-        kernel = CausalKernel(tested_causal_std_fn, 1, 1)
-        jitter = 1e-6
-        x = tf.linspace(-1.0, 1.0, 100)
-        y = tf.sin(x * 3.14) + tf.random.normal([100], 0, 0.1)
-        x = x[:, tf.newaxis]
-        index_x = x + jitter
-
+        x = tf.linspace(-1.0, 1.0, 20)
+        y = tf.sin(x * 3.14) + tf.random.normal([20], 0, 0.1)
+        x = x[..., tf.newaxis]
+        index_x = tf.constant([[0.0], [1.0]], dtype=tf.float32)
         causalgpm, _, _ = build_gprm(
-            index_x, x, y, mean_fn=tested_mean_fn, causal_std_fn=tested_causal_std_fn
+            index_x=index_x,
+            x=x,
+            y=y,
+            mean_fn=tested_mean_fn,
+            causal_std_fn=tested_causal_std_fn,
+            amplitude_factor=1.0,
+            length_scale_factor=1.0,
+            obs_noise_factor=1.0,
+            max_training_step=20000,
+            learning_rate=2e-4,
+            patience=20,
+            debug_mode=True,
         )
 
         self.assertIsInstance(

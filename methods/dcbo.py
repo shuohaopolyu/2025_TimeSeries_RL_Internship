@@ -84,7 +84,6 @@ class DynCausalBayesOpt:
     def run(self):
         """Run Dynamic Causal Bayesian Optimization"""
         opt_history = self._ini_opt_history()
-        print(opt_history)
 
         for temporal_index in range(self.T):
             # Update the observational data
@@ -336,7 +335,7 @@ class DynCausalBayesOpt:
             i_samples = draw_samples_from_sem_hat_dev(
                 self.sem_estimated,
                 self.num_monte_carlo,
-                temporal_index,
+                temporal_index=temporal_index,
                 intervention=i_intervention,
             )
             self.dyn_graph.temporal_index = temporal_index
@@ -642,6 +641,7 @@ class DynCausalBayesOpt:
             ei = tf.where(tf.math.is_nan(ei), tf.zeros_like(ei), ei)
             ei_max_this_es = tf.reduce_max(ei, axis=0)
             ei_max_index = tf.argmax(ei, axis=0)
+            print(ei_max_this_es, ei_max_index)
             candidate_points_max = candidate_points[ei_max_index, :]
             if ei_max_this_es > _ei:
                 _ei = ei_max_this_es
