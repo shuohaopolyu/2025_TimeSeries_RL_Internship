@@ -48,9 +48,6 @@ def build_gprm(
         kernel = CausalKernel(
             causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale
         )
-        # observation_noise_variance = (
-        #     0.0  # CausalKernel does not have explicit noise defined.
-        # )
 
         assert (
             mean_fn is not None
@@ -95,7 +92,7 @@ def build_gprm(
             patience_counter += 1
 
         if patience_counter > patience:
-            print(f"Early stopping at step {step}")
+            # print(f"Early stopping at step {step}")
             is_early_stopping = True
             break
 

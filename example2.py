@@ -6,7 +6,7 @@ import seaborn as sns
 
 num_data = 30
 num_data_plt = 1000
-jitter = 1e-6
+jitter = 0.0
 obs_index = tf.linspace(-1.0, 1.0, num_data)
 obs = tf.sin(obs_index * 3.14) + tf.random.normal([num_data], 0, 1.0)
 obs_index = tf.reshape(obs_index, [-1, 1])
@@ -46,7 +46,7 @@ def causal_std_fn(x):
 
 
 causalgpm, _, _ = build_gprm(
-    index_points, obs_index, obs, mean_fn=mean_fn, causal_std_fn=causal_std_fn, debug_mode=True, max_training_step=10000
+    index_points, obs_index, obs, mean_fn=mean_fn, causal_std_fn=causal_std_fn, debug_mode=True, max_training_step=50000, learning_rate=1e-2
 )
 print(index_points.shape, obs_index.shape, obs.shape)
 gpm, _, _ = build_gprm(

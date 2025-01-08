@@ -17,7 +17,7 @@ tfd = tfp.distributions
 # tf.random.set_seed(1)
 
 sem_model = StationaryModel_dev()
-num_samples = 50
+num_samples = 100
 temporal_index = 2
 full_samples = OrderedDict([(key, []) for key in sem_model.static().keys()])
 epsilon = OrderedDict(
@@ -27,7 +27,7 @@ epsilon = OrderedDict(
     ]
 )
 
-epsilon_x1 = tf.linspace(-3.0, 5.0, num_samples)[:, tf.newaxis]
+epsilon_x1 = tf.linspace(-5.0, 5.0, num_samples)[:, tf.newaxis]
 epsilon_x23 = tfd.Normal(0.0, 0.1).sample((num_samples, 2))
 epsilon["X"] = tf.concat([epsilon_x1, epsilon_x23], axis=1)
 D_obs = draw_samples_from_sem_dev(
@@ -73,7 +73,7 @@ D_intervene_ini = OrderedDict(
     [(("X",), D_intervene_ini_x), (("Z",), D_intervene_ini_z)]
 )
 # print(D_intervene_ini)
-intervention_domain = OrderedDict([("X", [-3.0, 5.0]), ("Z", [-5.0, 20.0])])
+intervention_domain = OrderedDict([("X", [-5.0, 5.0]), ("Z", [-5.0, 20.0])])
 num_trials = 15
 task = "min"
 cost_fn = equal_cost
@@ -104,9 +104,9 @@ dcbo.opt_intervene_history[0]["decision_vars"] = (("Z",), [tf.constant(-3.2)])
 dcbo.opt_intervene_history[0]["optimal_value"] = -2.1
 priors = dcbo._prior_causal_gp(1)
 
-candidate_points = tf.linspace(-3.0, 5.0, 100)[:, tf.newaxis]
+candidate_points = tf.linspace(-5.0, 20.0, 100)[:, tf.newaxis]
 
-x_prior_mean, x_prior_std = priors[("X",)]
+x_prior_mean, x_prior_std = priors[("Z",)]
 
 pred_mean = x_prior_mean(candidate_points)
 pred_std = x_prior_std(candidate_points)

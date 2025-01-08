@@ -32,7 +32,9 @@ def label_pairs(D_obs: OrderedDict, node: str, predecessors: list) -> tuple:
     return obs_data_x, obs_data_y
 
 
-def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) -> dict:
+def fcns4sem(
+    the_graph: object, D_obs: OrderedDict, temporal_index: int = None, **gprm_kwargs
+) -> dict:
     """Each node in the dynamic graph can either be generated based on emission or transition functions.
     Given the observation dataset, this function will fit the emission and transition functions for each node.
 
@@ -49,9 +51,16 @@ def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) 
     # find the maximum temporal index
     max_temporal_index = int(sorted_nodes[-1].split("_")[1])
     if D_obs[sorted_nodes[0].split("_")[0]].shape[1] < (max_temporal_index + 1):
-        print("Warning: The observation data is not enough for the maximum temporal step.")
+        print(
+            "Warning: The observation data is not enough for the maximum temporal step."
+        )
 
     fcns = {t: OrderedDict() for t in range(max_temporal_index + 1)}
+
+    obs_noise_factor = gprm_kwargs.get("observation_noise_factor", 1e-1)
+    learning_rate = gprm_kwargs.get("learning_rate", 2e-4)
+    max_training_step = gprm_kwargs.get("max_training_step", 20000)
+    debug_mode = gprm_kwargs.get("debug_mode", True)
 
     for node in sorted_nodes:
         temporal_index = int(node.split("_")[1])
@@ -69,7 +78,17 @@ def fcns4sem(the_graph: object, D_obs: OrderedDict, temporal_index: int = None) 
             obs_data_x, obs_data_y = label_pairs(D_obs, node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
+            gprm, _, _ = build_gprm(
+                index_x=index_ini,
+                x=obs_data_x,
+                y=obs_data_y,
+                obs_noise_factor=obs_noise_factor,
+                learning_rate=learning_rate,
+                max_training_step=max_training_step,
+                debug_mode=debug_mode,
+                amplitude_factor = 3.0,
+                length_scale_factor= 1.0,
+            )
             fcns[temporal_index][node_name] = build_gaussian_process(gprm, predecessors)
     return fcns
 
@@ -79,6 +98,7 @@ def fy_and_fny(
     D_obs: OrderedDict,
     target_node_name: str,
     temporal_index: int = None,
+    **gprm_kwargs
 ) -> tuple:
     """Given the observation dataset, this function will fit the
     emission and transition functions for the target node at each time step.
@@ -101,10 +121,17 @@ def fy_and_fny(
     # find the maximum temporal index
     max_temporal_index = int(sorted_nodes[-1].split("_")[1])
     if D_obs[sorted_nodes[0].split("_")[0]].shape[1] < (max_temporal_index + 1):
-        print("Warning: The observation data is not enough for the maximum temporal step.")
+        print(
+            "Warning: The observation data is not enough for the maximum temporal step."
+        )
 
     fy_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
     fny_fcns = {(t): OrderedDict() for t in range(max_temporal_index + 1)}
+
+    obs_noise_factor = gprm_kwargs.get("observation_noise_factor", 1e-1)
+    learning_rate = gprm_kwargs.get("learning_rate", 2e-4)
+    max_training_step = gprm_kwargs.get("max_training_step", 20000)
+    debug_mode = gprm_kwargs.get("debug_mode", True)
 
     for t in range(max_temporal_index + 1):
         if temporal_index is not None and t != temporal_index:
@@ -115,83 +142,104 @@ def fy_and_fny(
         ny_nodes = []
         assert predecessors, "The target node has no predecessors."
         for predecessor in predecessors:
-            predecessor_index = int(predecessor.split("_")[1])
-            if predecessor_index < t:
+            if predecessor.split("_")[0] == target_node_name:
                 y_nodes.append(predecessor)
-            elif predecessor_index == t:
+            else:
                 ny_nodes.append(predecessor)
         if y_nodes:
             # if the target node has predecessors at previous time steps
             # then based on assumption 1, the target node is impacted by two functions, i.e., transition and emission functions
-            y_nodes_current = [
-                node.split("_")[0] + "_" + str(int(node.split("_")[1]) + 1)
-                for node in y_nodes
-            ]
-            # print(current_node, y_nodes_current)
-            obs_data_x_fy, obs_data_y_fy = label_pairs(D_obs, current_node, y_nodes_current)
-            # obs_data_y_fy = obs_data_y_fy + 1e-4 * tf.random.normal(obs_data_y_fy.shape)
-            index_ini = tf.ones((1, len(y_nodes_current)))
-            # build the Gaussian Process Regression Model
-            print("fy")
-            gprm_fy, _, _ = build_gprm(index_x=index_ini, x=obs_data_x_fy, y=obs_data_y_fy, obs_noise_factor=1e-2)
-            def mean_fcn_fy(new_index, gprm_fy=gprm_fy):
-                return gprm_fy.get_marginal_distribution(new_index).mean()
-            
-            def std_fcn_fy(new_index, gprm_fy=gprm_fy):
-                return gprm_fy.get_marginal_distribution(new_index).stddev()
-            
-            fy_fcns[t] = [mean_fcn_fy, std_fcn_fy]
+            # y_nodes_current = [
+            #     node.split("_")[0] + "_" + str(int(node.split("_")[1]) + 1)
+            #     for node in y_nodes
+            # ]
+            # obs_data_x_fy, obs_data_y_fy = label_pairs(
+            #     D_obs, current_node, y_nodes_current
+            # )
+            # index_ini = tf.ones((1, len(y_nodes_current)))
+            # # build the Gaussian Process Regression Model
+            # gprm_fy, _, _ = build_gprm(
+            #     index_x=index_ini,
+            #     x=obs_data_x_fy,
+            #     y=obs_data_y_fy,
+            #     obs_noise_factor=obs_noise_factor,
+            #     learning_rate=learning_rate,
+            #     max_training_step=max_training_step,
+            #     debug_mode=debug_mode,
+            # )
 
+            # def mean_fcn_fy(new_index, gprm_fy=gprm_fy):
+            #     return gprm_fy.get_marginal_distribution(new_index).mean()
+
+            # def std_fcn_fy(new_index, gprm_fy=gprm_fy):
+            #     return gprm_fy.get_marginal_distribution(new_index).stddev()
+
+            def mean_fcn_fy(new_index):
+                return tf.reduce_mean(new_index, axis=1)
+            
+            def std_fcn_fy(new_index):
+                return tf.math.reduce_mean(new_index, axis=1) * 1e-4
+
+            fy_fcns[t] = [mean_fcn_fy, std_fcn_fy]
 
             # build the emission function
             obs_data_x, obs_data_y = label_pairs(D_obs, current_node, ny_nodes)
+            print(current_node, ny_nodes)
+            print(obs_data_x, obs_data_y)
+
             obs_data_x0, _ = label_pairs(D_obs, current_node, y_nodes)
-            fy_pred = fy_fcns[t][0](obs_data_x0)
+            print(y_nodes)
+            print(obs_data_x0)
+            fy_pred = mean_fcn_fy(obs_data_x0)
             obs_data_fny = obs_data_y - fy_pred
             index_ini = tf.ones((1, len(ny_nodes)))
 
-            # sort_idx = tf.argsort(obs_data_x, axis=0)
-            # plt_obs_x = tf.squeeze(tf.gather(obs_data_x, sort_idx, axis=0), axis=-1)
-            # plt_obs_y = tf.squeeze(tf.gather(obs_data_fny, sort_idx, axis=0))
-            # plt.plot(plt_obs_x, plt_obs_y, "o")
-
             # build the Gaussian Process Regression Model
-            print("fny")
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_fny, obs_noise_factor=1e-2)
+            gprm, _, _ = build_gprm(
+                index_x=index_ini,
+                x=obs_data_x,
+                y=obs_data_fny,
+                obs_noise_factor=obs_noise_factor,
+                learning_rate=learning_rate,
+                max_training_step=max_training_step,
+                debug_mode=debug_mode,
+            )
+
             def mean_fcn(new_index, gprm=gprm):
                 return gprm.get_marginal_distribution(new_index).mean()
-            
+
             def std_fcn(new_index, gprm=gprm):
                 return gprm.get_marginal_distribution(new_index).stddev()
-            
-            # plt.plot(plt_obs_x, mean_fcn(plt_obs_x), "r")
-            # plt.fill_between(
-            #     tf.squeeze(plt_obs_x),
-            #     tf.squeeze(mean_fcn(plt_obs_x) - 2 * std_fcn(plt_obs_x)),
-            #     tf.squeeze(mean_fcn(plt_obs_x) + 2 * std_fcn(plt_obs_x)),
-            #     alpha=0.2,
-            #     color="k",
-            # )
-            # plt.show()
+
             fny_fcns[t] = [mean_fcn, std_fcn]
 
         else:
+            fy_fcns[t] = [None, None]
+
             assert len(ny_nodes) == len(predecessors)
             # if the target node has no predecessors at previous time steps
             # then the target node is impacted by a single emission functions
             obs_data_x, obs_data_y = label_pairs(D_obs, current_node, predecessors)
             index_ini = tf.ones((1, len(predecessors)))
             # build the Gaussian Process Regression Model
-            gprm, _, _ = build_gprm(index_x=index_ini, x=obs_data_x, y=obs_data_y)
+            gprm, _, _ = build_gprm(
+                index_x=index_ini,
+                x=obs_data_x,
+                y=obs_data_y,
+                obs_noise_factor=obs_noise_factor,
+                learning_rate=learning_rate,
+                max_training_step=max_training_step,
+                debug_mode=debug_mode,
+            )
+
             def mean_fcn(new_index, gprm=gprm):
                 return gprm.get_marginal_distribution(new_index).mean()
-            
+
             def std_fcn(new_index, gprm=gprm):
                 return gprm.get_marginal_distribution(new_index).stddev()
-            
+
             fny_fcns[t] = [mean_fcn, std_fcn]
 
-            fy_fcns[t] = [None, None]
 
     if temporal_index is None:
         return fy_fcns, fny_fcns

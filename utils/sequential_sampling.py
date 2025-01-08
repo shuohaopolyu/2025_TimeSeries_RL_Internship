@@ -253,7 +253,6 @@ def draw_samples_from_sem_hat_dev(
                     sample[key] = (sem_hat.static()[key](sample, num_samples))[:, tf.newaxis]
             else:
                 if intervention is not None and intervention[key][t] is not None:
-                    # print(intervention[key][t])
                     sample[key] = tf.concat(
                         (sample[key],
                         tf.ones((num_samples, 1)) * intervention[key][t]),
@@ -265,5 +264,4 @@ def draw_samples_from_sem_hat_dev(
                         (sem_hat.dynamic()[key](t, sample, num_samples))[:, tf.newaxis]),
                         axis=1,
                     )
-        # print(sample)
     return sample

@@ -27,7 +27,7 @@ epsilon = OrderedDict(
     ]
 )
 
-epsilon_x1 = tf.linspace(-3.0, 8.0, num_samples)[:, tf.newaxis]
+epsilon_x1 = tf.linspace(-3.0, 5.0, num_samples)[:, tf.newaxis]
 epsilon_x23 = tfd.Normal(0.0, 0.3).sample((num_samples, 2))
 epsilon["X"] = tf.concat([epsilon_x1, epsilon_x23], axis=1)
 D_obs = draw_samples_from_sem_dev(
@@ -69,18 +69,18 @@ intervention_ini = {
 D_intervene_ini_z = draw_samples_from_sem_dev(
     sem_model, 1, 0, intervention=intervention_ini, epsilon=0.0
 )
-# D_intervene_ini = OrderedDict(
-#     [(("X",), D_intervene_ini_x), (("Z",), D_intervene_ini_z)]
-# )
 D_intervene_ini = OrderedDict(
-    [(("X",), D_intervene_ini_x)]
+    [(("X",), D_intervene_ini_x), (("Z",), D_intervene_ini_z)]
 )
+# D_intervene_ini = OrderedDict(
+#     [(("X",), D_intervene_ini_x)]
+# )
 # print(D_intervene_ini)
 intervention_domain = OrderedDict([("X", [-3.0, 5.0]), ("Z", [-5.0, 20.0])])
 num_trials = 15
 task = "min"
 cost_fn = equal_cost
-num_anchor_points = 300
+num_anchor_points = 100
 num_monte_carlo = 100
 jitter = 1e-6
 dcbo = DynCausalBayesOpt(
@@ -91,10 +91,15 @@ dcbo = DynCausalBayesOpt(
     intervention_domain,
     num_trials,
     task,
-    cost_fn,
-    num_anchor_points,
-    num_monte_carlo,
-    jitter,
+    cost_fcn = cost_fn,
+    num_anchor_points=num_anchor_points,
+    num_monte_carlo=num_monte_carlo,
+    jitter = jitter,
+    learning_rate=1e-4,
+    intervene_noise_factor=1e-1,
+    observation_noise_factor=1e-1,
+    max_training_step=30000,
+    debug_mode=True,
 )
 
 opt_history = [[] for _ in range(dcbo.T)]
@@ -130,6 +135,7 @@ def y_z(z_samples):
     
 posterior_mean_candidate_points = dcbo.posterior_causal_gp[("Z",)][0]()
 posterior_std_candidate_points = dcbo.posterior_causal_gp[("Z",)][1]()
+print(posterior_mean_candidate_points.shape, posterior_std_candidate_points.shape)
 
 ref_y = y_z(dcbo.candidate_points_dict[("Z",)])
 
