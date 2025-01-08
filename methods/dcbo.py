@@ -44,8 +44,8 @@ class DynCausalBayesOpt:
         jitter: float = 1e-6,
         ini_global_extreme_abs=1e3,
         learning_rate=1e-4,
-        intervene_noise_factor=1e-1,
-        observation_noise_factor=1e-1,
+        intervene_noise_factor=1e-2,
+        observation_noise_factor=1e-2,
         max_training_step=20000,
         debug_mode=False,
     ):
@@ -83,7 +83,9 @@ class DynCausalBayesOpt:
 
     def run(self):
         """Run Dynamic Causal Bayesian Optimization"""
-        opt_history = [[] for _ in range(self.T)]
+        opt_history = self._ini_opt_history()
+        print(opt_history)
+
         for temporal_index in range(self.T):
             # Update the observational data
             self._update_observational_data(temporal_index)
@@ -123,7 +125,6 @@ class DynCausalBayesOpt:
                     self.opt_intervene_history[temporal_index]["optimal_value"]
                 )
 
-
                 print("Temporal index:", temporal_index, ". Trial:", trial)
                 print(
                     "Intervened exploration set:",
@@ -145,6 +146,26 @@ class DynCausalBayesOpt:
                     temporal_index
                 )
             )
+        return opt_history
+
+    def _ini_opt_history(self):
+        opt_history = [[] for _ in range(self.T)]
+        ini_global_extreme = (
+            self.ini_global_extreme_abs
+            if self.task == "min"
+            else -self.ini_global_extreme_abs
+        )
+        i_D_interven = self.D_interven[0]
+        for _, sub_dict in i_D_interven.items():
+            if self.task == "min":
+                extreme_value = (tf.reduce_min(sub_dict[self.target_var])).numpy()
+                if extreme_value < ini_global_extreme:
+                    ini_global_extreme = extreme_value
+            elif self.task == "max":
+                extreme_value = (tf.reduce_max(sub_dict[self.target_var])).numpy()
+                if extreme_value > ini_global_extreme:
+                    ini_global_extreme = extreme_value
+        opt_history[0].append(ini_global_extreme)
         return opt_history
 
     def _intervention_points(self, es) -> tf.Tensor:
@@ -317,16 +338,15 @@ class DynCausalBayesOpt:
                 self.num_monte_carlo,
                 temporal_index,
                 intervention=i_intervention,
-                seed=None,
             )
             self.dyn_graph.temporal_index = temporal_index
             the_graph = self.dyn_graph.graph.copy()
             i_input_fny = self._input_fny(the_graph, i_samples, temporal_index)
-            i_samples_mean_fny_xiw = fny_fcn[0](i_input_fny)[tf.newaxis, :]
-            i_samples_std_fny_xiw = fny_fcn[1](i_input_fny)[tf.newaxis, :]
+            i_samples_mean_fny_xiw = fny_fcn[0](i_input_fny)
+            i_samples_std_fny_xiw = fny_fcn[1](i_input_fny)
             i_samples_fny_xiw = tfp.distributions.Normal(
                 i_samples_mean_fny_xiw, i_samples_std_fny_xiw
-            ).sample()
+            ).sample(1)
             if i == 0:
                 samples_mean_fny_xiw = i_samples_fny_xiw
             else:
@@ -353,6 +373,7 @@ class DynCausalBayesOpt:
             learning_rate=self.learning_rate,
             max_training_step=self.max_training_step,
             debug_mode=self.debug_mode,
+            intervention_domain=self.intervention_domain,
         )
         for es in self.exploration_set:
             predecessor = predecessor_of_target.copy()
@@ -512,6 +533,7 @@ class DynCausalBayesOpt:
             _, _, y_star = self._optimal_intervene_value(temporal_index)
             posterior_mean_candidate_points = self.posterior_causal_gp[es][0]()
             posterior_std_candidate_points = self.posterior_causal_gp[es][1]()
+            print(posterior_std_candidate_points)
             y_star = y_star * tf.ones_like(posterior_mean_candidate_points)
 
             axs[es_idx].plot(candidate_points, posterior_mean_candidate_points[:, None])
@@ -600,7 +622,9 @@ class DynCausalBayesOpt:
                 )
 
         plt.savefig(
-            "./experiments/stat_{}_{}.png".format(temporal_index, self.trial_index),
+            "./demo/experiments/stat_{}_{}.png".format(
+                temporal_index, self.trial_index
+            ),
             dpi=300,
             bbox_inches="tight",
         )
@@ -674,8 +698,31 @@ class DynCausalBayesOpt:
             learning_rate=self.learning_rate,
             max_training_step=self.max_training_step,
             debug_mode=self.debug_mode,
+            intervention_domain=self.intervention_domain,
         )
+        if self.debug_mode:
+            self._plot_fcns_full(fcns_full)
         self.sem_estimated = sem_hat(fcns_full)()
+
+    def _plot_fcns_full(self, fcns_full, num_samples=100) -> None:
+        for t, fcns in fcns_full.items():
+            if fcns is None:
+                print("The SEM model at time step {} is not estimated.".format(t))
+                continue
+            else:
+                for node, fcn in fcns.items():
+                    if node == "Z":
+                        input = tf.linspace(-5.0, 5.0, 100)[:, tf.newaxis]
+                        sample = OrderedDict([("X", input)])
+                    if node == "Y":
+                        input = tf.linspace(-5.0, 20.0, 100)[:, tf.newaxis]
+                        sample = OrderedDict([("Z", input)])
+                    if node == "X":
+                        continue
+                    for i in range(num_samples):
+                        output = fcn(sample)
+                        plt.plot(input, output, label=node)
+                    plt.show()
 
     def _update_observational_data(self, temporal_index: int) -> None:
         # currently, the full observational data is available at each time step

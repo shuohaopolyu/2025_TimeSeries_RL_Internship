@@ -42,11 +42,11 @@ def build_gprm(
 
     if causal_std_fn is None:
         kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-            amplitude=amplitude, length_scale=length_scale
+            amplitude=amplitude, length_scale=length_scale, feature_ndims=x.shape[1]
         )
     else:
         kernel = CausalKernel(
-            causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale
+            causal_std_fn=causal_std_fn, amplitude=amplitude, length_scale=length_scale, feature_ndims=x.shape[1]
         )
 
         assert (

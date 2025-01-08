@@ -124,28 +124,31 @@ class CausalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
             exponent = exponent + 2.0 * tf.math.log(amplitude)
         return tf.exp(exponent)
 
+    # @tf.function
+    # def _apply_causal_variance(self, x1, x2, example_ndims=0):
+    #     k_x1 = self.causal_std_fn(x1)
+    #     k_x2 = self.causal_std_fn(x2)
+    #     if k_x1.shape.ndims == 1:
+    #         k_x1 = k_x1[..., tf.newaxis]
+    #     if k_x2.shape.ndims == 1:
+    #         k_x2 = k_x2[tf.newaxis, ...]
+    #     k_x12 = k_x1 * k_x2
+    #     if x1.shape.ndims == 2 and x2.shape.ndims == 2:
+    #         k_x12 = k_x12[..., 0]
+    #     return k_x12
 
-    def _apply_causal_variance(self, x1, x2, example_ndims=0):
+    def _apply_causal_variance(self, x1, x2):
         if x1 is x2:
-            return (self.causal_std_fn(x1) ** 2)
-        k_x1 = self.causal_std_fn(x1)
-        k_x2 = self.causal_std_fn(x2)
-        if k_x1.shape.ndims == 1:
-            k_x1 = k_x1[..., tf.newaxis]
-        if k_x2.shape.ndims == 1:
-            k_x2 = k_x2[tf.newaxis, ...]
+            return self.causal_std_fn(x1)**2
+        k_x1 = tf.expand_dims(self.causal_std_fn(x1), -1)
+        k_x2 = tf.expand_dims(self.causal_std_fn(x2), -2)
         k_x12 = tf.matmul(k_x1, k_x2)
-        if x1.shape.ndims == 2 and x2.shape.ndims == 2:
-            k_x12 = k_x12[..., 0]
         return k_x12
-
 
     def _apply(self, x1, x2, example_ndims=0):
         return self._apply_with_distance(
             x1, x2, example_ndims=example_ndims
-        ) 
-    # + self._apply_causal_variance(x1, x2, example_ndims=example_ndims)
-    
+        ) + self._apply_causal_variance(x1, x2)
     
     def _parameter_control_dependencies(self, is_init):
         if not self.validate_args:

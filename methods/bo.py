@@ -10,7 +10,7 @@ import networkx as nx
 
 
 class BayesOpt:
-    """Bayesian Optimization"""
+    """Bayesian Optimization, not tested yet"""
 
     def __init__(
         self,
