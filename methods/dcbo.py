@@ -533,65 +533,7 @@ class DynCausalBayesOpt:
             _, _, y_star = self._optimal_intervene_value(temporal_index)
             posterior_mean_candidate_points = self.posterior_causal_gp[es][0]()
             posterior_std_candidate_points = self.posterior_causal_gp[es][1]()
-            print(posterior_std_candidate_points)
             y_star = y_star * tf.ones_like(posterior_mean_candidate_points)
-
-            axs[es_idx].plot(candidate_points, posterior_mean_candidate_points[:, None])
-            axs[es_idx].fill_between(
-                candidate_points[:, 0],
-                posterior_mean_candidate_points - 1.96 * posterior_std_candidate_points,
-                posterior_mean_candidate_points + 1.96 * posterior_std_candidate_points,
-                alpha=0.2,
-            )
-            if temporal_index in self.D_interven:
-                if es in self.D_interven[temporal_index]:
-                    axs[es_idx].scatter(
-                        self.D_interven[temporal_index][es][es[0]][:, temporal_index],
-                        self.D_interven[temporal_index][es][self.target_var][
-                            :, temporal_index
-                        ],
-                        color="red",
-                        marker="x",
-                    )
-
-            axs[es_idx].set_title(
-                "Posterior of the causal GP for exploration set {}".format(es),
-                fontsize=8,
-            )
-            if temporal_index == 0:
-                axs[es_idx].set_ylim(-5, 5)
-                axs[es_idx].set_yticks([-5, -3, -1, 1, 3, 5])
-            elif temporal_index == 1:
-                axs[es_idx].set_ylim(-8, 4)
-                axs[es_idx].set_yticks([-8, -6, -4, -2, 0, 2, 4])
-
-            elif temporal_index == 2:
-                axs[es_idx].set_ylim(-10, 4)
-                axs[es_idx].set_yticks([-10, -8, -6, -4, -2, 0, 2, 4])
-
-            axs[es_idx].set_xlim(
-                self.intervention_domain[es[0]][0], self.intervention_domain[es[0]][1]
-            )
-            if es_idx == 0:
-                axs[es_idx].set_xticks([-3, -1, 1, 3, 5])
-            else:
-                axs[es_idx].set_xticks([-5, 0, 5, 10, 15, 20])
-            axs[es_idx].tick_params(axis="both", direction="in", labelsize=8)
-
-            axs[es_idx].set_xlabel(es[0], fontsize=8)
-            axs[es_idx].set_ylabel(self.target_var, fontsize=8)
-            axs[es_idx].text(
-                0.5,
-                0.9,
-                "Temporal index: {}; Trial: {}".format(
-                    temporal_index, self.trial_index
-                ),
-                ha="center",
-                va="center",
-                transform=axs[es_idx].transAxes,
-                fontsize=8,
-            )
-
             # Expected improvement
             if self.task == "min":
                 z = (
@@ -621,14 +563,72 @@ class DynCausalBayesOpt:
                     z
                 )
 
-        plt.savefig(
-            "./demo/experiments/stat_{}_{}.png".format(
-                temporal_index, self.trial_index
-            ),
-            dpi=300,
-            bbox_inches="tight",
-        )
-        plt.close()
+            if self.debug_mode:
+                axs[es_idx].plot(candidate_points, posterior_mean_candidate_points[:, None])
+                axs[es_idx].fill_between(
+                    candidate_points[:, 0],
+                    posterior_mean_candidate_points - 1.96 * posterior_std_candidate_points,
+                    posterior_mean_candidate_points + 1.96 * posterior_std_candidate_points,
+                    alpha=0.2,
+                )
+                if temporal_index in self.D_interven:
+                    if es in self.D_interven[temporal_index]:
+                        axs[es_idx].scatter(
+                            self.D_interven[temporal_index][es][es[0]][:, temporal_index],
+                            self.D_interven[temporal_index][es][self.target_var][
+                                :, temporal_index
+                            ],
+                            color="red",
+                            marker="x",
+                        )
+
+                axs[es_idx].set_title(
+                    "Posterior of the causal GP for exploration set {}".format(es),
+                    fontsize=8,
+                )
+                if temporal_index == 0:
+                    axs[es_idx].set_ylim(-5, 5)
+                    axs[es_idx].set_yticks([-5, -3, -1, 1, 3, 5])
+                elif temporal_index == 1:
+                    axs[es_idx].set_ylim(-8, 4)
+                    axs[es_idx].set_yticks([-8, -6, -4, -2, 0, 2, 4])
+
+                elif temporal_index == 2:
+                    axs[es_idx].set_ylim(-10, 4)
+                    axs[es_idx].set_yticks([-10, -8, -6, -4, -2, 0, 2, 4])
+
+                axs[es_idx].set_xlim(
+                    self.intervention_domain[es[0]][0], self.intervention_domain[es[0]][1]
+                )
+                if es_idx == 0:
+                    axs[es_idx].set_xticks([-3, -1, 1, 3, 5])
+                else:
+                    axs[es_idx].set_xticks([-5, 0, 5, 10, 15, 20])
+                axs[es_idx].tick_params(axis="both", direction="in", labelsize=8)
+
+                axs[es_idx].set_xlabel(es[0], fontsize=8)
+                axs[es_idx].set_ylabel(self.target_var, fontsize=8)
+                axs[es_idx].text(
+                    0.5,
+                    0.9,
+                    "Temporal index: {}; Trial: {}".format(
+                        temporal_index, self.trial_index
+                    ),
+                    ha="center",
+                    va="center",
+                    transform=axs[es_idx].transAxes,
+                    fontsize=8,
+                )
+
+        if self.debug_mode:
+            plt.savefig(
+                "./demo/experiments/stat_{}_{}.png".format(
+                    temporal_index, self.trial_index
+                ),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
 
         return self.D_acquisition
 

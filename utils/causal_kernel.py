@@ -33,8 +33,10 @@ class CausalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
         validate_args=False,
         dtype=tf.float32,
         name="CausalKernel",
+        jitter=1e-6,
     ):
         parameters = dict(locals())
+        self.jitter = jitter
         if (length_scale is not None) and (inverse_length_scale is not None):
             raise ValueError(
                 "Must specify at most one of `length_scale` and "
@@ -124,25 +126,12 @@ class CausalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
             exponent = exponent + 2.0 * tf.math.log(amplitude)
         return tf.exp(exponent)
 
-    # @tf.function
-    # def _apply_causal_variance(self, x1, x2, example_ndims=0):
-    #     k_x1 = self.causal_std_fn(x1)
-    #     k_x2 = self.causal_std_fn(x2)
-    #     if k_x1.shape.ndims == 1:
-    #         k_x1 = k_x1[..., tf.newaxis]
-    #     if k_x2.shape.ndims == 1:
-    #         k_x2 = k_x2[tf.newaxis, ...]
-    #     k_x12 = k_x1 * k_x2
-    #     if x1.shape.ndims == 2 and x2.shape.ndims == 2:
-    #         k_x12 = k_x12[..., 0]
-    #     return k_x12
-
     def _apply_causal_variance(self, x1, x2):
         if x1 is x2:
             return self.causal_std_fn(x1)**2
         k_x1 = tf.expand_dims(self.causal_std_fn(x1), -1)
         k_x2 = tf.expand_dims(self.causal_std_fn(x2), -2)
-        k_x12 = tf.matmul(k_x1, k_x2)
+        k_x12 = tf.matmul(k_x1, k_x2) + self.jitter
         return k_x12
 
     def _apply(self, x1, x2, example_ndims=0):
