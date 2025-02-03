@@ -53,8 +53,10 @@ class BIOCausalDiscovery:
         self.time_eval = time_eval
 
     def run(self):
-        self._update_m_0()
-        self._update_m_1()
+        if not hasattr(self, "m_0"):
+            self._update_m_0()
+        if not hasattr(self, "m_1"):
+            self._update_m_1()
         for i in range(self.num_int):
             self._update_bayes_factor_01_int()
             self._update_prior_p_dc()
@@ -97,6 +99,17 @@ class BIOCausalDiscovery:
         self.max_p_dc = tf.reduce_max(results)
         self.x_opt = x[tf.argmax(results)]
         return self.x_opt, self.max_p_dc
+    
+    def _ini_max_p_dc(self):
+        x = tfd.Uniform(
+            self.intervention_domain[0], self.intervention_domain[1]
+        ).sample((100,))
+        self._update_m_0()
+        self._update_m_1()
+        self._update_bayes_factor_01_int()
+        self._update_prior_p_dc()
+        results = tf.map_fn(self._p_dc, x)
+        return tf.reduce_max(results)
 
     def _recorder(self):
         if not hasattr(self, "max_p_dc_record"):
@@ -122,6 +135,14 @@ class BIOCausalDiscovery:
         axs[1, 1].plot(self.p_h1_D_int_record)
         axs[1, 1].set_title("Prior of H1 condition on D_int")
         plt.show()
+
+    def get_recorder_data(self):
+        result = OrderedDict()
+        result["max_p_dc"] = self.max_p_dc_record
+        result["bayes_factor_01_int"] = self.bayes_factor_01_int_record
+        result["p_h0_D_int"] = self.p_h0_D_int_record
+        result["p_h1_D_int"] = self.p_h1_D_int_record
+        return result
 
     def _bayes_factor_01(self, y: tf.Tensor, x: tf.Tensor):
         m_0_y = self.m_0.prob(y)
