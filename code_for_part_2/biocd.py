@@ -4,6 +4,7 @@ import tensorflow_probability as tfp
 from utils import build_gprm, build_mix_gaussian_variable, build_mix_gaussian_function
 import matplotlib.pyplot as plt
 import seaborn as sns
+import time
 
 tfd = tfp.distributions
 
@@ -28,6 +29,7 @@ class BIOCausalDiscovery:
         learning_rate: float = 0.001,
         patience: int = 20,
         debug_mode: bool = False,
+        time_eval: bool = False,
     ):
         self.true_sem = true_sem
         self.D_obs = D_obs
@@ -48,6 +50,7 @@ class BIOCausalDiscovery:
         self.learning_rate = learning_rate
         self.patience = patience
         self.debug_mode = debug_mode
+        self.time_eval = time_eval
 
     def run(self):
         self._update_m_0()
@@ -55,7 +58,12 @@ class BIOCausalDiscovery:
         for i in range(self.num_int):
             self._update_bayes_factor_01_int()
             self._update_prior_p_dc()
-            self._find_x_opt()
+            if self.time_eval:
+                time_start = time.time()
+                self._find_x_opt()
+                print(f"Time for finding x_opt: {time.time() - time_start}")
+            else:
+                self._find_x_opt()
             print(
                 f"Optimal intervention: {'%.2f' % self.x_opt.numpy()}, Max p_dc: {'%.2f' % self.max_p_dc.numpy()}, ",
                 f"LogBF01: {'%.2f' % tf.math.log(self.bayes_factor_01_int).numpy()}, ",
