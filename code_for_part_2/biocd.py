@@ -23,11 +23,11 @@ class BIOCausalDiscovery:
         num_monte_carlo: int = 4096,
         num_mixture: int = 50,
         num_samples_per_sem: int = 100000,
-        intervention_domain: list = [-6.0, 6.0],
+        intervention_domain: list = None,
         max_iter: int = 20000,
         learning_rate: float = 0.001,
         patience: int = 20,
-        debgu_mode: bool = False,
+        debug_mode: bool = False,
     ):
         self.true_sem = true_sem
         self.D_obs = D_obs
@@ -39,11 +39,15 @@ class BIOCausalDiscovery:
         self.num_monte_carlo = num_monte_carlo
         self.num_mix = num_mixture
         self.num_samples_per_sem = num_samples_per_sem
-        self.intervention_domain = intervention_domain
+        self.intervention_domain = (
+            [tf.reduce_min(D_obs["X"]), tf.reduce_max(D_obs["X"])]
+            if intervention_domain is None
+            else intervention_domain
+        )
         self.max_iter = max_iter
         self.learning_rate = learning_rate
         self.patience = patience
-        self.debug_mode = debgu_mode
+        self.debug_mode = debug_mode
 
     def run(self):
         self._update_m_0()
@@ -51,11 +55,14 @@ class BIOCausalDiscovery:
         for i in range(self.num_int):
             self._update_bayes_factor_01_int()
             self._update_prior_p_dc()
-            x_opt, max_p_dc = self._find_x_opt()
+            self._find_x_opt()
             print(
-                f"Optimal intervention: {x_opt.numpy()}, Max p_dc: {max_p_dc.numpy()}, LogBF01: {tf.math.log(self.bayes_factor_01_int).numpy()}"
+                f"Optimal intervention: {'%.2f' % self.x_opt.numpy()}, Max p_dc: {'%.2f' % self.max_p_dc.numpy()}, ",
+                f"LogBF01: {'%.2f' % tf.math.log(self.bayes_factor_01_int).numpy()}, ",
+                f"Prior of H0: {'%.2f' % self.p_h0_D_int}, Prior of H1: {'%.2f' % self.p_h1_D_int}",
             )
-            self._update_D_int(x_opt)
+            self._recorder()
+            self._update_D_int()
 
     def _p_dc(self, x: tf.Tensor) -> tf.Tensor:
         y_0 = self.m_0.sample((self.num_monte_carlo,))
@@ -72,7 +79,6 @@ class BIOCausalDiscovery:
             )
             * self.p_h1_D_int
         )
-
         return p_dc
 
     def _find_x_opt(self):
@@ -80,16 +86,42 @@ class BIOCausalDiscovery:
             self.intervention_domain[0], self.intervention_domain[1]
         ).sample((100,))
         results = tf.map_fn(self._p_dc, x)
-        max_p_dc = tf.reduce_max(results)
-        x_opt = x[tf.argmax(results)]
-        return x_opt, max_p_dc
+        self.max_p_dc = tf.reduce_max(results)
+        self.x_opt = x[tf.argmax(results)]
+        return self.x_opt, self.max_p_dc
+
+    def _recorder(self):
+        if not hasattr(self, "max_p_dc_record"):
+            self.max_p_dc_record = []
+            self.bayes_factor_01_int_record = []
+            self.p_h0_D_int_record = []
+            self.p_h1_D_int_record = []
+        self.max_p_dc_record.append(self.max_p_dc.numpy())
+        self.bayes_factor_01_int_record.append(
+            tf.math.log(self.bayes_factor_01_int).numpy()
+        )
+        self.p_h0_D_int_record.append(self.p_h0_D_int)
+        self.p_h1_D_int_record.append(self.p_h1_D_int)
+
+    def recorder_plot(self):
+        fig, axs = plt.subplots(2, 2, figsize=(6, 6))
+        axs[0, 0].plot(self.max_p_dc_record)
+        axs[0, 0].set_title("Max p_dc")
+        axs[0, 1].plot(self.bayes_factor_01_int_record)
+        axs[0, 1].set_title("log Bayes Factor")
+        axs[1, 0].plot(self.p_h0_D_int_record)
+        axs[1, 0].set_title("Prior of H0 condition on D_int")
+        axs[1, 1].plot(self.p_h1_D_int_record)
+        axs[1, 1].set_title("Prior of H1 condition on D_int")
+        plt.show()
 
     def _bayes_factor_01(self, y: tf.Tensor, x: tf.Tensor):
         m_0_y = self.m_0.prob(y)
         m_1_yx = self.m_1.prob(y, x)
         return (m_0_y / m_1_yx) * self.bayes_factor_01_int
 
-    def _update_D_int(self, x_opt: tf.Tensor):
+    def _update_D_int(self):
+        x_opt = self.x_opt
         if not self.D_int:
             self.D_int["X"] = tf.reshape(x_opt, (1,))
             self.D_int["Y"] = tf.reduce_mean(
@@ -121,8 +153,8 @@ class BIOCausalDiscovery:
             num_mix=self.num_mix,
             learning_rate=self.learning_rate,
             max_training_step=self.max_iter,
+            debug_mode=self.debug_mode,
         )
-        # plt.figure()
         # sns.kdeplot(self.m_0.sample((5000,)))
         # sns.kdeplot(self.D_obs["Y"])
         # plt.show()
@@ -135,6 +167,7 @@ class BIOCausalDiscovery:
             num_mix=self.num_mix,
             learning_rate=self.learning_rate,
             max_training_step=self.max_iter,
+            debug_mode=self.debug_mode,
         )
         return self.m_1
 

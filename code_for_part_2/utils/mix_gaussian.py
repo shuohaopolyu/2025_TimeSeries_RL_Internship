@@ -63,6 +63,7 @@ def build_mix_gaussian_variable(
     best_loss = float("inf")
     patience_counter = 0
 
+    print("Start optimization for mixture Gaussian variable.")
     for i in range(max_training_step):
         loss = optimize()
 
@@ -76,9 +77,10 @@ def build_mix_gaussian_variable(
         else:
             patience_counter += 1
 
-        if patience_counter > 20:
+        if patience_counter > 20 and debug_mode:
             print("Early stopping due to no improvement.")
             break
+    print("Optimization finished.")
 
     # After optimization, construct the final mixture model with learned weights
     final_mixture = tfd.MixtureSameFamily(
@@ -95,6 +97,7 @@ def build_mix_gaussian_function(
     num_mix: int,
     learning_rate: float,
     max_training_step: int,
+    debug_mode: bool = False,
 ):
     A = tf.Variable(1.0, name="A")
     B = tf.Variable(1.0, name="B")
@@ -142,10 +145,11 @@ def build_mix_gaussian_function(
     best_loss = float("inf")
     patience_counter = 0
 
+    print("Start optimization for mixture Gaussian function.")
     for i in range(max_training_step):
         loss = optimize()
 
-        if i % 100 == 0:
+        if i % 100 == 0 and debug_mode:
             print(f"Iteration {i}, Loss: {loss.numpy():.4f}")
 
         # Early stopping based on patience
@@ -155,10 +159,11 @@ def build_mix_gaussian_function(
         else:
             patience_counter += 1
 
-        if patience_counter > 20:
+        if patience_counter > 20 and debug_mode:
             print("Early stopping due to no improvement.")
             break
 
+    print("Optimization finished.")
     # After optimization, construct the final mixture model with learned weights
     p_psi = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(probs=tf.nn.softmax(weights)),

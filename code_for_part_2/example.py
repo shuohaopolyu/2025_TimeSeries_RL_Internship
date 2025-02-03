@@ -6,21 +6,24 @@ import matplotlib.pyplot as plt
 from biocd import BIOCausalDiscovery
 from collections import OrderedDict
 
-y2x = Y2X()
-D_obs = y2x.propagate(5000)
+x2y = X2Y()
+D_obs = x2y.propagate(5000)
 
-# D_int = OrderedDict((("X", tf.constant([0.8, -1.2])), ("Y", tf.constant([0.4, 0.9]))))
 
 cd = BIOCausalDiscovery(
-    true_sem=y2x,
+    true_sem=x2y,
     D_obs=D_obs,
-    debgu_mode=True,
     max_iter=20000,
     num_mixture=50,
     num_monte_carlo=4096,
-    beta=0.2
+    beta=0.2,
+    num_int=10,
+    debug_mode=True
 )
 cd.run()
+cd.recorder_plot()
+
+# D_int = OrderedDict((("X", tf.constant([0.8, -1.2])), ("Y", tf.constant([0.4, 0.9]))))
 
 # cd._update_m_0()
 # cd._update_m_1()
@@ -46,3 +49,18 @@ cd.run()
 # sns.kdeplot(sample_1, ax=axs[1])
 # sns.kdeplot(sample_2, ax=axs[1])
 # plt.show()
+
+# u2xy = U2XY()
+# D_obs = u2xy.propagate(5000)
+# cd = BIOCausalDiscovery(
+#     true_sem=u2xy,
+#     D_obs=D_obs,
+#     max_iter=20000,
+#     num_mixture=100,
+#     num_monte_carlo=4096,
+#     beta=0.2,
+#     num_int=10,
+#     debug_mode=False
+# )
+# cd.run()
+# cd.recorder_plot()
