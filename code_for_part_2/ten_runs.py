@@ -80,7 +80,7 @@ def plot_results():
         "font.weight": "normal",
         "font.size": 8,
         'text.usetex': True,
-        'text.latex.preamble': r'\usepackage{amsfonts}'
+        "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}"
     }
     rcParams.update(config)
     plt.rcParams["axes.unicode_minus"] = True
