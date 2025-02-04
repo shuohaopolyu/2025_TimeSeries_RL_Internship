@@ -116,7 +116,7 @@ def plot_results():
             axs[j, i].set_xlim([0, 9])
             axs[j, i].set_xticks([0, 3, 6, 9], ["0", "3", "6", "9"])
             axs[j, i].tick_params(axis="both", direction="in")
-            axs[j, i].set_title(titles[j], fontsize=8)
+            axs[j, i].set_title(titles[j], fontsize=8, pad=0)
             axs[j, 0].set_ylim([0.0, 1.1])
             axs[j, 0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0], ["0", "0.2", "0.4", "0.6", "0.8", "1"])
             axs[j, i].text(-0.2, -0.2, "(" + chr(97+j*4+i) + ")", transform=axs[j, i].transAxes)
