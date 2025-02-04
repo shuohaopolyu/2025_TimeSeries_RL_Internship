@@ -111,10 +111,10 @@ def plot_results():
     titles = [r"$\mathbb{H}_0: X \leftarrow Y$", r"$\mathbb{H}_0: X \leftarrow U \rightarrow Y$", r"$\mathbb{H}_1: X \rightarrow Y$"]
     for i in range(4):
         for j in range(3):
-            axs[j, i].set_ylabel(ylabels[i], fontsize=8, labelpad=0)
+            axs[j, i].set_ylabel(ylabels[i], fontsize=8)
             axs[j, i].set_xlabel("Active sampling size", fontsize=8, labelpad=0)
             axs[j, i].set_xlim([0, 9])
-            axs[j, i].set_xticks([0, 3, 6, 9])
+            axs[j, i].set_xticks([0, 3, 6, 9], ["0", "3", "6", "9"])
             axs[j, i].tick_params(axis="both", direction="in")
             axs[j, i].set_title(titles[j], fontsize=8)
             axs[j, 0].set_ylim([0.0, 1.1])
