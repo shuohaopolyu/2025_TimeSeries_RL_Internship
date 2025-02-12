@@ -1,7 +1,7 @@
-# 2025_TimeSeries_RL_Internship
+# Dynamic Causal Bayesian Optimization
 
 ## Overview
-This repository contains the implementation of the Dynamic Causal Bayesian Optimization (DCBO) method as proposed by Aglietti et al. It leverages the TensorFlow Probability framework for conducting analyses. The repository is structured as follows:
+This folder contains the implementation of the Dynamic Causal Bayesian Optimization (DCBO) method as proposed by Aglietti et al. It leverages the TensorFlow Probability framework for conducting analyses. The folder is structured as follows:
 
 - `causal_graph/`: Contains methods for generating and processing causal graphs.
 - `demo/`: Contains demonstrations of question 1 and synthetic experiments.
@@ -9,11 +9,10 @@ This repository contains the implementation of the Dynamic Causal Bayesian Optim
 - `sem/`: Includes implementations of various structural equation models.
 - `tests/`: Contains unit and integration tests to ensure the reliability of the code.
 - `utils/`: Useful functions for data processing in the context of the DCBO method.
-- `Report_Dynamic_Causal_Bayesian_Optimization.pdf`: Discusses the implementation of the DCBO method.
+- `report_cdbo.pdf`: Discusses the implementation of the DCBO method.
 
 
 ## Demonstrations
-
 We offer three demonstrations to illustrate the capabilities of our implementation:
 
 * **[Demo 1. Exploration set identification:](demo/demo1_find_exploration_set.ipynb)** Demonstrates how to find an exploration set for a given causal graph and target variable.
