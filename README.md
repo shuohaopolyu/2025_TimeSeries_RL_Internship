@@ -17,8 +17,7 @@ This repository contains the code and documentation developed in response to the
    + Tests for the implementation in the `question3_part2\tests` folder.
 
 3. **question1_part1** (To be completed by 3 March 2025)
-   + Code and implementation for Efficient Bayesian Inference with Latent Hamiltonian Neural
-Networks in No-U-Turn Sampling by Dhulipala et al. (2023).
+   + Code and implementation for Efficient Bayesian Inference with Latent Hamiltonian Neural Networks in No-U-Turn Sampling by Dhulipala et al. (2023).
 
 4. **reports**
    + Consolidated resport of all findings.
