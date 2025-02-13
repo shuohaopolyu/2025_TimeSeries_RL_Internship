@@ -1,5 +1,5 @@
 import unittest
-from prob_models import IndepedentGaussians, OneDimGaussianMixtureDensity
+from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity
 import tensorflow as tf
 
 class TestIndepedentGaussians(unittest.TestCase):

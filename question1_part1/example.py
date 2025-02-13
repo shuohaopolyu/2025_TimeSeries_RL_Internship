@@ -1,4 +1,4 @@
-from prob_models import IndepedentGaussians, OneDimGaussianMixtureDensity
+from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from hamilton_system import HamiltonianSystem

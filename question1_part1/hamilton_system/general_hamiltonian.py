@@ -5,6 +5,7 @@ class HamiltonianSystem:
     def __init__(self, expU, expK):
         self.expU = expU
         self.expK = expK
+        self.mass = expK.sigmas
 
     def H(self, q, p):
         expH = self.expU.f(q) * self.expK.f(p)
@@ -23,14 +24,14 @@ class HamiltonianSystem:
         return tape.gradient(H, q)
 
     def symplectic_integrate(self, q0, p0, dt, n_steps):
-        hist = []
         q = q0
         p = p0
+        hist = tf.concat([q, p], axis=-1)[tf.newaxis, :]
         for _ in range(n_steps):
-            hist.append([q.numpy(), p.numpy()])
-            # q_forward = q + dt / self.mass * p - dt ** 2 / (2 * self.mass) * self.dHdq(q, p)
-            q_forward = q + dt / 1.0 * p - dt ** 2 / (2 * 1.0) * self.dHdq(q, p)
+            q_forward = q + dt / self.mass * p - dt ** 2 / (2 * self.mass) * self.dHdq(q, p)
             p_forward = p - dt / 2 * (self.dHdq(q, p) + self.dHdq(q_forward, p))
             q = q_forward
             p = p_forward
-        return hist
+            qp = tf.concat([q, p], axis=-1)[tf.newaxis, :]
+            hist = tf.concat([hist, qp], axis=0)
+        return tf.constant(hist)
