@@ -1,4 +1,4 @@
-from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity
+from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity, ThreeDimRosenbrock
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from hamilton_system import HamiltonianSystem
@@ -18,4 +18,12 @@ hist = tf.constant(hist)
 
 plt.plot(hist[:, 0], hist[:, 1])
 plt.show()
+
+# expU = ThreeDimRosenbrock()
+# expK = IndepedentGaussians(tf.constant([0.0, 0.0, 0.0]), tf.constant([1.0, 1.0, 1.0]))
+# H_system = HamiltonianSystem(expU, expK)
+# hist = H_system.symplectic_integrate(tf.constant([1.0, 1.0, 1.0]), tf.constant([3.0, 3.0, 3.0]), 0.025, 500)
+
+# plt.plot(hist[:, 0], hist[:, 3])
+# plt.show()
 

@@ -1,18 +1,19 @@
 import tensorflow as tf
 
 
-class HamiltonianNeuralNetwork:
+class HamiltonianNeuralNetwork(tf.keras.Model):
 
     def __init__(
         self, num_layers: int, num_units: int, train_set: tf.Tensor, test_set: tf.Tensor
     ):
+        super().__init__()
         self.num_layers = num_layers
         self.num_units = num_units
         self.train_set = train_set
         self.test_set = test_set
         self.dense_layers = [
-            tf.layers.Dense(num_units, activation=tf.nn.tanh) for _ in range(num_layers)
-        ] + [tf.layers.Dense(1, activation=None)]
+            tf.keras.layers.Dense(num_units, activation=tf.nn.tanh) for _ in range(num_layers)
+        ] + [tf.keras.layers.Dense(1, activation=None)]
 
     def call(self, q, p):
         x = tf.concat([q, p], axis=-1)

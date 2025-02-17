@@ -1,5 +1,5 @@
 import unittest
-from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity
+from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity, ThreeDimRosenbrock
 import tensorflow as tf
 
 class TestIndepedentGaussians(unittest.TestCase):
@@ -50,6 +50,27 @@ class TestOneDimGaussianMixtureDensity(unittest.TestCase):
 
     def test_input_wrong_shape(self):
         model = OneDimGaussianMixtureDensity()
+        q = tf.ones((10, 2))
+        with self.assertRaises(AssertionError):
+            pdf = model.f(q)
+
+class TestThreeDimRosenbrock(unittest.TestCase):
+
+    def test_single_input(self):
+        model = ThreeDimRosenbrock()
+        q = tf.constant([1.0, 1.0, 1.0])
+        pdf = model.f(q)
+        self.assertEqual(pdf.shape, ())
+        self.assertAlmostEqual(pdf.numpy(), 1.0)
+
+    def test_batch_input(self):
+        model = ThreeDimRosenbrock()
+        q = tf.ones((10,3))
+        pdf = model.f(q)
+        self.assertEqual(pdf.shape, (10,))
+
+    def test_input_wrong_shape(self):
+        model = ThreeDimRosenbrock()
         q = tf.ones((10, 2))
         with self.assertRaises(AssertionError):
             pdf = model.f(q)
