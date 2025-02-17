@@ -12,8 +12,9 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
         self.train_set = train_set
         self.test_set = test_set
         self.dense_layers = [
-            tf.keras.layers.Dense(num_units, activation=tf.nn.tanh) for _ in range(num_layers)
-        ] + [tf.keras.layers.Dense(1, activation=None)]
+            tf.keras.layers.Dense(num_units, activation=tf.nn.tanh, use_bias=True)
+            for _ in range(num_layers)
+        ] + [tf.keras.layers.Dense(1, activation=None, use_bias=False)]
 
     def call(self, q, p):
         x = tf.concat([q, p], axis=-1)
@@ -23,26 +24,30 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
 
     def loss(self, q, p, dqdt, dpdt):
         with tf.GradientTape() as tape:
-            tape.watch(q)
-            tape.watch(p)
+            tape.watch([q, p])
             H = self.call(q, p)
         dHdq, dHdp = tape.gradient(H, [q, p])
-        loss = tf.keras.losses.MSE(dHdp, -dqdt) + tf.keras.losses.MSE(dHdq, dpdt)
+        loss = tf.reduce_sum(
+            tf.keras.losses.MSE(dHdp, -dqdt) + tf.keras.losses.MSE(dHdq, dpdt)
+        )
         return loss
 
-    def train(self, epochs=10000, batch_size=32):
-        optimizer = tf.train.AdamOptimizer()
+    def train(self, epochs=10000, batch_size=32, learning_rate=0.001):
+        optimizer = tf.keras.optimizers.Adam(learning_rate)
+        print("Training started...")
         for epoch in range(epochs):
             for i in range(0, self.train_set.shape[0], batch_size):
                 batch = self.train_set[i : i + batch_size, :]
                 q, p, dqdt, dpdt = tf.split(batch, 4, axis=-1)
                 with tf.GradientTape() as tape:
                     loss = self.loss(q, p, dqdt, dpdt)
-                trainable_vars = [var for layer in self.dense_layers for var in layer.trainable_variables]
+                trainable_vars = self.trainable_variables
                 gradients = tape.gradient(loss, trainable_vars)
                 optimizer.apply_gradients(zip(gradients, trainable_vars))
-            if epoch % 100 == 0:
+            if (epoch + 1) % 100 == 0:
                 q, p, dqdt, dpdt = tf.split(self.test_set, 4, axis=-1)
                 test_loss = self.loss(q, p, dqdt, dpdt)
-                print(f"Epoch {epoch}: Train loss {loss.numpy()}, Test loss {test_loss.numpy()}.")
+                print(
+                    f"Epoch {epoch+1}: Train loss {loss.numpy()}, Test loss {test_loss.numpy()}."
+                )
         print("Training complete!")

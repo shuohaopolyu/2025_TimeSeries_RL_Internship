@@ -3,6 +3,8 @@ import tensorflow as tf
 class HamiltonianSystem:
 
     def __init__(self, expU, expK):
+        # expU: exponential of negative potential energy
+        # expK: exponential of negative kinetic energy
         self.expU = expU
         self.expK = expK
         self.mass = expK.sigmas
