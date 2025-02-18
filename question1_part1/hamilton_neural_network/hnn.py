@@ -51,3 +51,18 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
                     f"Epoch {epoch+1}: Train loss {loss.numpy()}, Test loss {test_loss.numpy()}."
                 )
         print("Training complete!")
+
+    def forward(self, q, p):
+        return self.call(q, p)
+    
+    def dHdp(self, q, p):
+        with tf.GradientTape() as tape:
+            tape.watch(p)
+            H = self.call(q, p)
+        return tape.gradient(H, p)
+    
+    def dHdq(self, q, p):
+        with tf.GradientTape() as tape:
+            tape.watch(q)
+            H = self.call(q, p)
+        return tape.gradient(H, q)

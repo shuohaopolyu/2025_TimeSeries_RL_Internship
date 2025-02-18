@@ -63,3 +63,20 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
                     f"Epoch {epoch}: Train loss {loss.numpy()}, Test loss {test_loss.numpy()}."
                 )
         print("Training complete!")
+
+    def forward(self, q, p):
+        return tf.reduce_sum(self.call(q, p), axis=-1)
+    
+    def dHdp(self, q, p):
+        with tf.GradientTape() as tape:
+            tape.watch(p)
+            z = self.call(q, p)
+            H = tf.reduce_sum(z, axis=-1)
+        return tape.gradient(H, p)
+    
+    def dHdq(self, q, p):
+        with tf.GradientTape() as tape:
+            tape.watch(q)
+            z = self.call(q, p)
+            H = tf.reduce_sum(z, axis=-1)
+        return tape.gradient(H, q)

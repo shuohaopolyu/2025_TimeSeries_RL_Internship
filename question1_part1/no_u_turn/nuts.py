@@ -1,16 +1,90 @@
 import tensorflow as tf
 
-class NoUTurnSampling():
+
+class NoUTurnSampling:
+    def __init__(self, num_samples, q0, dt, hnn, lhnn):
+        self.num_samples = num_samples
+        self.dt = dt
+        assert (
+            hnn is not None or lhnn is not None
+        ), "Either hnn or lhnn must be provided"
+        self.hnn = hnn if hnn is not None else lhnn
+        self.q_hist = []
+        self.q_hist.append(q0)
+
+    def __call__(self):
+        for i in range(self.num_samples):
+            p0 = tf.random.normal(self.q_hist[-1].shape)
+            H = self.hnn.forward(self.q_hist[i], p0)
+            u = tf.random.uniform(1, 0, tf.exp(-H))
+            q_minus, q_plus = self.q_hist[i], self.q_hist[i]
+            p_minus, p_plus = p0, p0
+            j = 0
+            C = [(self.q_hist[i], p0)]
+            s = 1
+            while s == 1:
+                v_j = tf.random.choice([-1, 1])
+                if v_j == -1:
+                    q_minus, p_minus, _, _, C_prime, s_prime = self.buildtree(
+                        q_minus, p_minus, u, v_j, j
+                    )
+                else:
+                    _, _, q_plus, p_plus, C_prime, s_prime = self.buildtree(
+                        q_plus, p_plus, u, v_j, j
+                    )
+                if s_prime == 1:
+                    C += C_prime
+                position_moved = q_plus - q_minus
+                s = (
+                    s_prime
+                    * tf.greater_equal(tf.matmul(position_moved, p_minus), 0)
+                    * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+                )
+                j += 1
+            # sample q and p randomly from C
+            idx = tf.random.uniform(1, 0, len(C), dtype=tf.int32)
+            self.q_hist.append(C[idx][0])
+
+    def buildtree(self, q0, p0, u, v_j, j, Delta_max=1000) -> tf.Tensor:
+        if j == 0:
+            q_prime, p_prime = self.leapfrog(q0, p0, v_j)
+            H = self.hnn.forward(q_prime, p_prime)
+            if u <= tf.exp(-H):
+                C_prime = [(q_prime, p_prime)]
+            else:
+                C_prime = []
+            s_prime =  tf.math.greater(-H, tf.math.log(u) - Delta_max)
+            return q_prime, p_prime, q_prime, p_prime, C_prime, s_prime
+        else:
+            q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = self.buildtree(
+                q0, p0, u, v_j, j - 1
+            )
+            if v_j == -1:
+                q_minus, p_minus, _, _, C_prime_prime, s_prime_prime = self.buildtree(
+                    q_minus, p_minus, u, v_j, j - 1
+                )
+            else:
+                _, _, q_plus, p_plus, C_prime_prime, s_prime_prime = self.buildtree(
+                    q_plus, p_plus, u, v_j, j - 1
+                )
+            position_moved = q_plus - q_minus
+            s_prime = s_prime * s_prime_prime * tf.greater_equal(
+                tf.matmul(position_moved, p_minus), 0
+            ) * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+            C_prime += C_prime_prime
+            return q_minus, p_minus, q_plus, p_plus, C_prime, s_prime
+            
+    def leapfrog(self, q0, p0, v_j, mass) -> tf.Tensor:
+        q = q0.copy()
+        p = p0.copy()
+        q_ = q  +  v_j * (self.dt / mass * p - self.dt ** 2 / (2 * mass) * self.hnn.dHdq(q, p))
+        p_ = p - v_j * self.dt / 2 * (self.hnn.dHdq(q, p) + self.hnn.dHdq(q_, p))
+        return q_, p_
+
+
+class EfficientNoUTurnSampling:
     def __init__(self, num_samples, q0, p0, dt, NN):
         pass
 
-    def buildtree(self, q0, p0, dt, n_steps, direction) -> tf.Tensor:
-        pass
-
-
-class EfficientNoUTurnSampling():
-    def __init__(self, num_samples, q0, p0, dt, NN):
-        pass
-
-    def buildtree(self, q0, p0, dt, n_steps, direction) -> tf.Tensor:
+    def buildtree(self, q0, p0, n_steps, direction) -> tf.Tensor:
         pass
