@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 class NoUTurnSampling:
     def __init__(self, num_samples, q0, dt, hnn, lhnn):
         self.num_samples = num_samples
@@ -53,7 +52,7 @@ class NoUTurnSampling:
                 C_prime = [(q_prime, p_prime)]
             else:
                 C_prime = []
-            s_prime =  tf.math.greater(-H, tf.math.log(u) - Delta_max)
+            s_prime = tf.math.greater(-H, tf.math.log(u) - Delta_max)
             return q_prime, p_prime, q_prime, p_prime, C_prime, s_prime
         else:
             q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = self.buildtree(
@@ -68,18 +67,23 @@ class NoUTurnSampling:
                     q_plus, p_plus, u, v_j, j - 1
                 )
             position_moved = q_plus - q_minus
-            s_prime = s_prime * s_prime_prime * tf.greater_equal(
-                tf.matmul(position_moved, p_minus), 0
-            ) * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+            s_prime = (
+                s_prime
+                * s_prime_prime
+                * tf.greater_equal(tf.matmul(position_moved, p_minus), 0)
+                * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+            )
             C_prime += C_prime_prime
             return q_minus, p_minus, q_plus, p_plus, C_prime, s_prime
-            
+
     def leapfrog(self, q0, p0, v_j, mass) -> tf.Tensor:
         q = q0.copy()
         p = p0.copy()
-        q_ = q  +  v_j * (self.dt / mass * p - self.dt ** 2 / (2 * mass) * self.hnn.dHdq(q, p))
-        p_ = p - v_j * self.dt / 2 * (self.hnn.dHdq(q, p) + self.hnn.dHdq(q_, p))
-        return q_, p_
+        _q = q + v_j * (
+            self.dt / mass * p - self.dt**2 / (2 * mass) * self.hnn.dHdq(q, p)
+        )
+        _p = p - v_j * self.dt / 2 * (self.hnn.dHdq(q, p) + self.hnn.dHdq(_q, p))
+        return _q, _p
 
 
 class EfficientNoUTurnSampling:

@@ -80,3 +80,20 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
             z = self.call(q, p)
             H = tf.reduce_sum(z, axis=-1)
         return tape.gradient(H, q)
+    
+    def symplectic_integrate(self, q0, p0, dt, n_steps) -> tf.Tensor:
+        q = q0
+        p = p0
+        dqdt = self.dHdp(q, p)
+        dpdt = self.dHdq(q, p)
+        hist = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+        for _ in range(n_steps):
+            q_forward = q + dt * p
+            p_forward = p - dt * self.dHdq(q, p)
+            q = q_forward
+            p = p_forward
+            dqdt = self.dHdp(q, p)
+            dpdt = -self.dHdq(q, p)
+            qp = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+            hist = tf.concat([hist, qp], axis=0)
+        return tf.constant(hist)

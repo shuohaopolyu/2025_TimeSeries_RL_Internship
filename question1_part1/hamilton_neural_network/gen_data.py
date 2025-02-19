@@ -39,7 +39,7 @@ class TrainTestData:
             q = hist[-1, 0:n_dof]
             p = tf.random.normal((n_dof,))
             # print when the progress first greater than 10%, 20%, ..., 100%
-            if (i + 1) % (int(self.num_samples // 10)) == 0:
-                print(f"{(i + 1) / self.num_samples * 100:.0f}%" + " done")
+            # if self.num_samples >= 10 and (i + 1) % (int(self.num_samples // 10)) == 0:
+            #     print(f"{(i + 1) / self.num_samples * 100:.0f}%" + " done")
         print("Finished generating samples.")
         return tf.stack(samples)
