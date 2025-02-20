@@ -1,6 +1,12 @@
 import tensorflow as tf
 
 class NoUTurnSampling:
+    """
+    No-U-Turn Sampling (NUTS) built from scratch based on the original paper:
+    Hoffman, M. D., and Gelman, A. (2014). The No-U-Turn Sampler: Adaptively Setting 
+    Path Lengths in Hamiltonian Monte Carlo.
+    """
+
     def __init__(self, num_samples, q0, dt, hnn, lhnn):
         self.num_samples = num_samples
         self.dt = dt
@@ -76,15 +82,13 @@ class NoUTurnSampling:
             C_prime += C_prime_prime
             return q_minus, p_minus, q_plus, p_plus, C_prime, s_prime
 
-    def leapfrog(self, q0, p0, v_j, mass) -> tf.Tensor:
-        q = q0.copy()
-        p = p0.copy()
-        _q = q + v_j * (
-            self.dt / mass * p - self.dt**2 / (2 * mass) * self.hnn.dHdq(q, p)
-        )
-        _p = p - v_j * self.dt / 2 * (self.hnn.dHdq(q, p) + self.hnn.dHdq(_q, p))
-        return _q, _p
-
+    def leapfrog(self, q0, p0, v_j) -> tf.Tensor:
+        q = tf.identity(q0)
+        p = tf.identity(p0)
+        p_half = p - 0.5 * self.dt * self.hnn.dHdq(q, p) * v_j
+        q_prime = q + self.dt * p_half
+        p_prime = p_half - 0.5 * self.dt * self.hnn.dHdq(q_prime, p_half) * v_j
+        return q_prime, p_prime
 
 class EfficientNoUTurnSampling:
     def __init__(self, num_samples, q0, p0, dt, NN):

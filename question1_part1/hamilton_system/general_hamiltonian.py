@@ -42,11 +42,12 @@ class HamiltonianSystem:
         q = q0
         p = p0
         dqdt = self.dHdp(q, p)
-        dpdt = self.dHdq(q, p)
+        dpdt = -self.dHdq(q, p)
         hist = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
         for _ in range(n_steps):
-            q_forward = q + dt / self.mass * p - dt ** 2 / (2 * self.mass) * self.dHdq(q, p)
-            p_forward = p - dt / 2 * (self.dHdq(q, p) + self.dHdq(q_forward, p))
+            p_half = p - 0.5 * dt * self.dHdq(q, p)
+            q_forward = q + dt / self.mass * p_half
+            p_forward = p_half - 0.5 * dt * self.dHdq(q_forward, p_half)
             q = q_forward
             p = p_forward
             dqdt = self.dHdp(q, p)
