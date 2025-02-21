@@ -7,7 +7,7 @@ class NoUTurnSampling:
     Path Lengths in Hamiltonian Monte Carlo.
     """
 
-    def __init__(self, num_samples, q0, dt, hnn, lhnn):
+    def __init__(self, num_samples, q0, dt, hnn=None, lhnn=None):
         self.num_samples = num_samples
         self.dt = dt
         assert (
@@ -19,16 +19,19 @@ class NoUTurnSampling:
 
     def __call__(self):
         for i in range(self.num_samples):
+            print(f"Sampling {i+1}/{self.num_samples}")
             p0 = tf.random.normal(self.q_hist[-1].shape)
             H = self.hnn.forward(self.q_hist[i], p0)
-            u = tf.random.uniform(1, 0, tf.exp(-H))
+            u = tf.random.uniform([], 0, tf.exp(-H))
             q_minus, q_plus = self.q_hist[i], self.q_hist[i]
             p_minus, p_plus = p0, p0
             j = 0
             C = [(self.q_hist[i], p0)]
             s = 1
             while s == 1:
-                v_j = tf.random.choice([-1, 1])
+                _v = tf.random.uniform([], -1.0, 1.0)
+                v_j = tf.sign(_v)
+                print(f"v_j: {v_j}")
                 if v_j == -1:
                     q_minus, p_minus, _, _, C_prime, s_prime = self.buildtree(
                         q_minus, p_minus, u, v_j, j
@@ -42,13 +45,14 @@ class NoUTurnSampling:
                 position_moved = q_plus - q_minus
                 s = (
                     s_prime
-                    * tf.greater_equal(tf.matmul(position_moved, p_minus), 0)
-                    * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+                    * tf.sign(tf.matmul(position_moved, p_minus))
+                    * tf.sign(tf.matmul(position_moved, p_plus))
                 )
                 j += 1
             # sample q and p randomly from C
-            idx = tf.random.uniform(1, 0, len(C), dtype=tf.int32)
+            idx = tf.random.uniform([], 0, len(C), dtype=tf.int32)
             self.q_hist.append(C[idx][0])
+            print(f"q_hist: {self.q_hist}")
 
     def buildtree(self, q0, p0, u, v_j, j, Delta_max=1000) -> tf.Tensor:
         if j == 0:
@@ -58,7 +62,7 @@ class NoUTurnSampling:
                 C_prime = [(q_prime, p_prime)]
             else:
                 C_prime = []
-            s_prime = tf.math.greater(-H, tf.math.log(u) - Delta_max)
+            s_prime = tf.sign(-H - tf.math.log(u) + Delta_max)
             return q_prime, p_prime, q_prime, p_prime, C_prime, s_prime
         else:
             q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = self.buildtree(
@@ -76,8 +80,8 @@ class NoUTurnSampling:
             s_prime = (
                 s_prime
                 * s_prime_prime
-                * tf.greater_equal(tf.matmul(position_moved, p_minus), 0)
-                * tf.greater_equal(tf.matmul(position_moved, p_plus), 0)
+                * tf.sign(tf.matmul(position_moved, p_minus))
+                * tf.sign(tf.matmul(position_moved, p_plus))
             )
             C_prime += C_prime_prime
             return q_minus, p_minus, q_plus, p_plus, C_prime, s_prime
