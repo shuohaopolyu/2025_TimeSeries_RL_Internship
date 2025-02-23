@@ -1,9 +1,10 @@
 import tensorflow as tf
 
+
 class NoUTurnSampling:
     """
     No-U-Turn Sampling (NUTS) built from scratch based on the original paper:
-    Hoffman, M. D., and Gelman, A. (2014). The No-U-Turn Sampler: Adaptively Setting 
+    Hoffman, M. D., and Gelman, A. (2014). The No-U-Turn Sampler: Adaptively Setting
     Path Lengths in Hamiltonian Monte Carlo.
     """
 
@@ -45,8 +46,8 @@ class NoUTurnSampling:
                 position_moved = q_plus - q_minus
                 s = (
                     s_prime
-                    * tf.sign(tf.matmul(position_moved, p_minus))
-                    * tf.sign(tf.matmul(position_moved, p_plus))
+                    * tf.cast(tf.reduce_sum(position_moved * p_minus) >= 0, tf.float32)
+                    * tf.cast(tf.reduce_sum(position_moved * p_plus) >= 0, tf.float32)
                 )
                 j += 1
             # sample q and p randomly from C
@@ -62,8 +63,9 @@ class NoUTurnSampling:
                 C_prime = [(q_prime, p_prime)]
             else:
                 C_prime = []
-            s_prime = tf.sign(-H - tf.math.log(u) + Delta_max)
+            s_prime = tf.cast(-H - tf.math.log(u) + Delta_max > 0, tf.float32)
             return q_prime, p_prime, q_prime, p_prime, C_prime, s_prime
+
         else:
             q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = self.buildtree(
                 q0, p0, u, v_j, j - 1
@@ -80,23 +82,20 @@ class NoUTurnSampling:
             s_prime = (
                 s_prime
                 * s_prime_prime
-                * tf.sign(tf.matmul(position_moved, p_minus))
-                * tf.sign(tf.matmul(position_moved, p_plus))
+                * tf.cast(tf.reduce_sum(position_moved * p_minus) >= 0, tf.float32)
+                * tf.cast(tf.reduce_sum(position_moved * p_plus) >= 0, tf.float32)
             )
             C_prime += C_prime_prime
             return q_minus, p_minus, q_plus, p_plus, C_prime, s_prime
 
-    def leapfrog(self, q0, p0, v_j) -> tf.Tensor:
-        q = tf.identity(q0)
-        p = tf.identity(p0)
+    def leapfrog(self, q0, p0, v_j) -> tuple:
+        assert q0.shape == p0.shape, "q0 and p0 must have the same shape."
+        if len(q0.shape) == 1:
+            q0 = q0[tf.newaxis, :]
+            p0 = p0[tf.newaxis, :]
+        q = q0
+        p = p0
         p_half = p - 0.5 * self.dt * self.hnn.dHdq(q, p) * v_j
         q_prime = q + self.dt * p_half
         p_prime = p_half - 0.5 * self.dt * self.hnn.dHdq(q_prime, p_half) * v_j
         return q_prime, p_prime
-
-class EfficientNoUTurnSampling:
-    def __init__(self, num_samples, q0, p0, dt, NN):
-        pass
-
-    def buildtree(self, q0, p0, n_steps, direction) -> tf.Tensor:
-        pass

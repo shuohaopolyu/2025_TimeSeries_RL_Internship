@@ -1,4 +1,5 @@
 import tensorflow as tf
+print(tf.__version__)
 
 
 class LatentHamiltonianNeuralNetwork(tf.keras.Model):
@@ -8,15 +9,11 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
         num_layers: int,
         num_units: int,
         num_latent_var: int,
-        train_set: tf.Tensor,
-        test_set: tf.Tensor,
     ):
         super().__init__()
         self.num_layers = num_layers
         self.num_units = num_units
         self.num_latent_var = num_latent_var
-        self.train_set = train_set
-        self.test_set = test_set
         self.dense_layers = [
             tf.keras.layers.Dense(num_units, activation=tf.nn.tanh)
             for _ in range(num_layers)
@@ -46,14 +43,14 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
         )
         return loss
 
-    def train(self, epochs=10000, batch_size=32, learning_rate=0.001):
+    def train(self, epochs=10000, batch_size=32, learning_rate=0.001, train_set=None, test_set=None):
         optimizer = tf.keras.optimizers.Adam(learning_rate)
         train_hist = []
         test_hist = []
         print("Training started...")
         for epoch in range(epochs):
-            for i in range(0, self.train_set.shape[0], batch_size):
-                batch = self.train_set[i : i + batch_size, :]
+            for i in range(0, train_set.shape[0], batch_size):
+                batch = train_set[i : i + batch_size, :]
                 q, p, dqdt, dpdt = tf.split(batch, 4, axis=-1)
                 with tf.GradientTape() as tape:
                     loss = self.loss_fcn(q, p, dqdt, dpdt)
@@ -61,7 +58,7 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
                 gradients = tape.gradient(loss, trainable_vars)
                 optimizer.apply_gradients(zip(gradients, trainable_vars))
             if epoch % 100 == 0:
-                q, p, dqdt, dpdt = tf.split(self.test_set, 4, axis=-1)
+                q, p, dqdt, dpdt = tf.split(test_set, 4, axis=-1)
                 test_loss = self.loss_fcn(q, p, dqdt, dpdt)
                 print(
                     f"Epoch {epoch}: Train loss {loss.numpy()}, Test loss {test_loss.numpy()}."

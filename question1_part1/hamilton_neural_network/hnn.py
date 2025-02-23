@@ -3,14 +3,10 @@ import tensorflow as tf
 
 class HamiltonianNeuralNetwork(tf.keras.Model):
 
-    def __init__(
-        self, num_layers: int, num_units: int, train_set: tf.Tensor, test_set: tf.Tensor
-    ):
+    def __init__(self, num_layers: int, num_units: int):
         super().__init__()
         self.num_layers = num_layers
         self.num_units = num_units
-        self.train_set = train_set
-        self.test_set = test_set
         self.dense_layers = [
             tf.keras.layers.Dense(num_units, activation=tf.nn.tanh, use_bias=True)
             for _ in range(num_layers)
@@ -21,7 +17,7 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
         for layer in self.dense_layers:
             x = layer(x)
         return x
-    
+
     def build(self, input_shape):
         pq = tf.zeros(input_shape)
         p, q = tf.split(pq, 2, axis=-1)
@@ -36,17 +32,25 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
             H = self.call(inputs)
         dHdq, dHdp = tape.gradient(H, [q, p])
         loss = tf.reduce_mean(
-             tf.keras.losses.MSE(dHdq, -dpdt) + tf.keras.losses.MSE(dHdp, dqdt))
+            tf.keras.losses.MSE(dHdq, -dpdt) + tf.keras.losses.MSE(dHdp, dqdt)
+        )
         return loss
 
-    def train(self, epochs=10000, batch_size=32, learning_rate=0.001):
+    def train(
+        self,
+        epochs=10000,
+        batch_size=32,
+        learning_rate=0.001,
+        train_set=None,
+        test_set=None,
+    ):
         optimizer = tf.keras.optimizers.Adam(learning_rate)
         train_hist = []
         test_hist = []
         print("Training started...")
         for epoch in range(epochs):
-            for i in range(0, self.train_set.shape[0], batch_size):
-                batch = self.train_set[i : i + batch_size, :]
+            for i in range(0, train_set.shape[0], batch_size):
+                batch = train_set[i : i + batch_size, :]
                 q, p, dqdt, dpdt = tf.split(batch, 4, axis=-1)
                 with tf.GradientTape() as tape:
                     train_loss = self.loss_fcn(q, p, dqdt, dpdt)
@@ -54,7 +58,7 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
                 gradients = tape.gradient(train_loss, trainable_vars)
                 optimizer.apply_gradients(zip(gradients, trainable_vars))
             if (epoch + 1) % 100 == 0:
-                q, p, dqdt, dpdt = tf.split(self.test_set, 4, axis=-1)
+                q, p, dqdt, dpdt = tf.split(test_set, 4, axis=-1)
                 test_loss = self.loss_fcn(q, p, dqdt, dpdt)
                 print(
                     f"Epoch {epoch+1}: Train loss {train_loss.numpy()}, Test loss {test_loss.numpy()}."
@@ -72,21 +76,21 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
             p = p[tf.newaxis, :]
         inputs = tf.concat([q, p], axis=-1)
         return self.call(inputs)
-    
+
     def dHdp(self, q, p):
         with tf.GradientTape() as tape:
             tape.watch(p)
             inputs = tf.concat([q, p], axis=-1)
             H = self.call(inputs)
         return tape.gradient(H, p)
-    
+
     def dHdq(self, q, p):
         with tf.GradientTape() as tape:
             tape.watch(q)
             inputs = tf.concat([q, p], axis=-1)
             H = self.call(inputs)
         return tape.gradient(H, q)
-    
+
     def symplectic_integrate(self, q0, p0, dt, n_steps) -> tf.Tensor:
         assert q0.shape == p0.shape, "q0 and p0 must have the same shape."
         if len(q0.shape) == 1:
