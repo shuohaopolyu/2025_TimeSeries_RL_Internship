@@ -1,4 +1,5 @@
 import tensorflow as tf
+
 print(tf.__version__)
 
 
@@ -9,23 +10,26 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
         num_layers: int,
         num_units: int,
         num_latent_var: int,
+        activation=tf.nn.tanh,
     ):
         super().__init__()
         self.num_layers = num_layers
         self.num_units = num_units
         self.num_latent_var = num_latent_var
         self.dense_layers = [
-            tf.keras.layers.Dense(num_units, activation=tf.nn.tanh)
+            tf.keras.layers.Dense(num_units, activation=activation)
             for _ in range(num_layers)
         ]
-        self.dense_layers.append(tf.keras.layers.Dense(num_latent_var, activation=None, use_bias=False))
+        self.dense_layers.append(
+            tf.keras.layers.Dense(num_latent_var, activation=None, use_bias=False)
+        )
 
     def call(self, inputs):
         x = inputs
         for layer in self.dense_layers:
             x = layer(x)
         return x
-    
+
     def build(self, input_shape):
         pq = tf.zeros(input_shape)
         p, q = tf.split(pq, 2, axis=-1)
@@ -43,7 +47,16 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
         )
         return loss
 
-    def train(self, epochs=10000, batch_size=32, learning_rate=0.001, train_set=None, test_set=None):
+    def train(
+        self,
+        epochs=10000,
+        batch_size=32,
+        learning_rate=0.001,
+        train_set=None,
+        test_set=None,
+        save_dir=None,
+        print_every=100,
+    ):
         optimizer = tf.keras.optimizers.Adam(learning_rate)
         train_hist = []
         test_hist = []
@@ -57,7 +70,7 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
                 trainable_vars = self.trainable_variables
                 gradients = tape.gradient(loss, trainable_vars)
                 optimizer.apply_gradients(zip(gradients, trainable_vars))
-            if epoch % 100 == 0:
+            if epoch % print_every == 0:
                 q, p, dqdt, dpdt = tf.split(test_set, 4, axis=-1)
                 test_loss = self.loss_fcn(q, p, dqdt, dpdt)
                 print(
@@ -65,6 +78,8 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
                 )
                 train_hist.append(loss.numpy())
                 test_hist.append(test_loss.numpy())
+                if save_dir:
+                    self.save_weights(save_dir)
         train_hist = tf.constant(train_hist)
         test_hist = tf.constant(test_hist)
         print("Training complete!")
@@ -76,19 +91,19 @@ class LatentHamiltonianNeuralNetwork(tf.keras.Model):
             p = p[tf.newaxis, :]
         inputs = tf.concat([q, p], axis=-1)
         return tf.reduce_sum(self.call(inputs), axis=-1)
-    
+
     def dHdp(self, q, p):
         with tf.GradientTape() as tape:
             tape.watch(p)
             H = self.forward(q, p)
         return tape.gradient(H, p)
-    
+
     def dHdq(self, q, p):
         with tf.GradientTape() as tape:
             tape.watch(q)
             H = self.forward(q, p)
         return tape.gradient(H, q)
-    
+
     def symplectic_integrate(self, q0, p0, dt, n_steps) -> tf.Tensor:
         assert q0.shape == p0.shape, "q0 and p0 must have the same shape."
         if len(q0.shape) == 1:

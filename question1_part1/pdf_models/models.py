@@ -54,20 +54,63 @@ class ThreeDimRosenbrock(PDFModel):
         assert q.shape[-1] == 3, "q must have dimension 3"
         if len(q.shape) == 1:
             q = q[tf.newaxis, :]
-            return (
-                tf.exp(
-                    -(
-                        (100 * (q[:, 1] - q[:, 0] ** 2) ** 2 + (1 - q[:, 0]) ** 2)
-                        + (100 * (q[:, 2] - q[:, 1] ** 2) ** 2 + (1 - q[:, 1]) ** 2)
-                    )
-                    / 20.0
-                )
-            )[0]
-        else:
-            return tf.exp(
-                -(
-                    (100 * (q[:, 1] - q[:, 0] ** 2) ** 2 + (1 - q[:, 0]) ** 2)
-                    + (100 * (q[:, 2] - q[:, 1] ** 2) ** 2 + (1 - q[:, 1]) ** 2)
-                )
-                / 20.0
+        return tf.exp(
+            -(
+                (100 * (q[:, 1] - q[:, 0] ** 2) ** 2 + (1 - q[:, 0]) ** 2)
+                + (100 * (q[:, 2] - q[:, 1] ** 2) ** 2 + (1 - q[:, 1]) ** 2)
             )
+            / 20.0
+        )
+
+
+class NegLogThreeDimRosenbrock(PDFModel):
+
+    def f(self, q: tf.Tensor):
+        assert q.shape[-1] == 3, "q must have dimension 3"
+        if len(q.shape) == 1:
+            q = q[tf.newaxis, :]
+        return (
+            (100 * (q[:, 1] - q[:, 0] ** 2) ** 2 + (1 - q[:, 0]) ** 2)
+            + (100 * (q[:, 2] - q[:, 1] ** 2) ** 2 + (1 - q[:, 1]) ** 2)
+        ) / 20.0
+        
+class NegLogIndepedentGaussians(PDFModel):
+    
+    def __init__(self, mus: tf.Tensor, sigmas: tf.Tensor):
+        self.mus = mus
+        self.sigmas = sigmas
+        assert (
+            len(mus.shape) == 1 and len(sigmas.shape) == 1
+        ), "mus and sigmas must be 1D tensors"
+        assert (
+            mus.shape[0] == sigmas.shape[0]
+        ), "mus and sigmas must have the same length"
+
+    def f(self, q: tf.Tensor):
+        assert q.shape[-1] == self.mus.shape[0], "q must have the same dimension as mus"
+        return tf.reduce_sum(
+            0.5 * (q - self.mus) ** 2 / self.sigmas**2,
+            axis=-1,
+        )
+    
+class NegLogNealFunnel(PDFModel):
+    
+    def f(self, q: tf.Tensor):
+        assert q.shape[-1] == 2, "q must have dimension 2"
+        if len(q.shape) == 1:
+            q = q[tf.newaxis, :]
+        return (
+            0.5 * q[:, 0] ** 2 / 3 ** 2 + 0.5 * q[:, 1] ** 2 / tf.exp(q[:, 0]) ** 2
+        )
+
+class NegLogTenDimRosenbrock(PDFModel):
+
+    def f(self, q: tf.Tensor):
+        assert q.shape[-1] == 10, "q must have dimension 10"
+        if len(q.shape) == 1:
+            q = q[tf.newaxis, :]
+        val = 0.0
+        for i in range(8):
+            val += (100 * (q[:, i + 1] - q[:, i] ** 2) ** 2 + (1 - q[:, i]) ** 2)
+        return val / 20.0
+

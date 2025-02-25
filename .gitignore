@@ -163,3 +163,5 @@ cython_debug/
 #.idea/
 
 /demo/experiments/*.png
+
+/question1_part1/exps/*txt

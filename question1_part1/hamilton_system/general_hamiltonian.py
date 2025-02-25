@@ -2,19 +2,33 @@ import tensorflow as tf
 
 class HamiltonianSystem:
 
-    def __init__(self, expU, expK):
+    def __init__(self, expU=None, expK=None, U=None, K=None, mass=None):
         # expU: exponential of negative potential energy
         # expK: exponential of negative kinetic energy
-        self.expU = expU
-        self.expK = expK
-        self.mass = expK.sigmas
+        if U is None and K is None:
+            self.expU = expU
+            self.expK = expK
+            self.U = None
+            self.K = None
+        else:
+            self.U = U
+            self.K = K
+            self.expU = None
+            self.expK = None
+        if mass is None:
+            self.mass = 1.0
+        else:
+            self.mass = mass
 
     def H(self, q, p) -> tf.Tensor:
         # q: shape (n_dof,), p: shape (n_dof,)
         # returns: Hamiltonian, shape ()
         # for batched q and p, returns shape (batch_size,)
-        expH = self.expU.f(q) * self.expK.f(p)
-        return -tf.math.log(expH)
+        if self.U is not None and self.K is not None:
+            return self.U.f(q) + self.K.f(p)
+        else:
+            expH = self.expU.f(q) * self.expK.f(p)
+            return -tf.math.log(expH)
     
     def dHdp(self, q, p) -> tf.Tensor:
         # q: shape (n_dof,), p: shape (n_dof,)
@@ -43,7 +57,10 @@ class HamiltonianSystem:
         p = p0
         dqdt = self.dHdp(q, p)
         dpdt = -self.dHdq(q, p)
-        hist = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+        if len(q.shape) == 1:
+            hist = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+        else:
+            hist = tf.concat([q, p, dqdt, dpdt], axis=-1)
         for _ in range(n_steps):
             p_half = p - 0.5 * dt * self.dHdq(q, p)
             q_forward = q + dt / self.mass * p_half
@@ -52,6 +69,9 @@ class HamiltonianSystem:
             p = p_forward
             dqdt = self.dHdp(q, p)
             dpdt = -self.dHdq(q, p)
-            qp = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+            if len(q.shape) == 1:
+                qp = tf.concat([q, p, dqdt, dpdt], axis=-1)[tf.newaxis, :]
+            else:
+                qp = tf.concat([q, p, dqdt, dpdt], axis=-1)
             hist = tf.concat([hist, qp], axis=0)
         return tf.constant(hist)

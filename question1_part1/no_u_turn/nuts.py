@@ -20,9 +20,14 @@ class NoUTurnSampling:
 
     def __call__(self):
         for i in range(self.num_samples):
-            print(f"Sampling {i+1}/{self.num_samples}")
+            # print(f"Sampling {i+1}/{self.num_samples}")
+            # print at 10% intervals
+            if i % (self.num_samples // 10) == 0:
+                print(f"Sampling finished {int(i/self.num_samples * 100)} %")
             p0 = tf.random.normal(self.q_hist[-1].shape)
             H = self.hnn.forward(self.q_hist[i], p0)
+            if H < 0:
+                H = 0.0
             u = tf.random.uniform([], 0, tf.exp(-H))
             q_minus, q_plus = self.q_hist[i], self.q_hist[i]
             p_minus, p_plus = p0, p0
@@ -32,7 +37,6 @@ class NoUTurnSampling:
             while s == 1:
                 _v = tf.random.uniform([], -1.0, 1.0)
                 v_j = tf.sign(_v)
-                print(f"v_j: {v_j}")
                 if v_j == -1:
                     q_minus, p_minus, _, _, C_prime, s_prime = self.buildtree(
                         q_minus, p_minus, u, v_j, j
@@ -53,7 +57,7 @@ class NoUTurnSampling:
             # sample q and p randomly from C
             idx = tf.random.uniform([], 0, len(C), dtype=tf.int32)
             self.q_hist.append(C[idx][0])
-            print(f"q_hist: {self.q_hist}")
+        print("Sampling finished 100 %")
 
     def buildtree(self, q0, p0, u, v_j, j, Delta_max=1000) -> tf.Tensor:
         if j == 0:

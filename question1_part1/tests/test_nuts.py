@@ -26,36 +26,37 @@ class TestNoUTurnSampling(unittest.TestCase):
         q_prime, p_prime = nuts.leapfrog(q0, p0, 1)
         self.assertEqual(q_prime.shape, q0.shape)
         self.assertEqual(p_prime.shape, p0.shape)
-        hist = []
-        for i in range(num_samples):
-            hist.append(q_prime)
-            q_prime, p_prime = nuts.leapfrog(q_prime, p_prime, 1)
-        hist = tf.concat(hist, axis=0)
-        plt.plot(hist.numpy().flatten())
-        plt.show()
+
+    def test_call(self):
+        q0 = tf.constant([[0.0]])
+        nuts = NoUTurnSampling(num_samples=500, q0=q0, dt=0.05, lhnn=self.lhnn)
+        nuts()
+        # q_hist = tf.concat(nuts.q_hist, axis=0)
+        # plt.hist(q_hist.numpy()[1000:, 0].flatten(), bins=30)
+        # plt.show()
+        self.assertEqual(len(nuts.q_hist), nuts.num_samples+1)
 
 
-    # def test_call(self):
-    #     q0 = tf.constant([[1.0]])
-    #     nuts = NoUTurnSampling(num_samples=200, q0=q0, dt=0.05, lhnn=self.lhnn)
-    #     nuts()
-    #     # self.assertEqual(len(nuts.q_hist), 101)
-    #     q_hist = tf.concat(nuts.q_hist, axis=0)
-    #     plt.hist(q_hist.numpy().flatten(), bins=30)
-    #     plt.show()
+    def test_buildtree(self):
+        q0 = tf.constant([[0.0]])
+        p0 = tf.constant([[1.0]])
+        H = self.lhnn.forward(q0, p0)
+        u = tf.random.uniform([], 0, tf.exp(-H))
+        nuts = NoUTurnSampling(num_samples=200, q0=q0, dt=0.01, lhnn=self.lhnn)
+        q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = (
+            nuts.buildtree(q0, p0, u, 1, 5)
+        )
+        C = tf.concat([c[0] for c in C_prime], axis=0)
+        symplectic = (self.lhnn.symplectic_integrate(q0, p0, 0.01, 32))[1:, :1]
+        # plt.plot(symplectic.numpy())
+        # plt.plot(C.numpy())
+        # plt.show()
+        # compare the leapfrog integrator with the symplectic integrator
+        self.assertTrue(
+            tf.reduce_mean(tf.abs(symplectic - C)) < 1e-4,
+            "The leapfrog integrator is not accurate.",)
+        self.assertEqual(q_minus.shape, q0.shape)
+        self.assertEqual(p_minus.shape, p0.shape)
+        self.assertEqual(q_plus.shape, q0.shape)
+        self.assertEqual(p_plus.shape, p0.shape)
 
-    # def test_buildtree(self):
-    #     q0 = tf.constant([[0.0]])
-    #     p0 = tf.constant([[1.0]])
-    #     H = self.lhnn.forward(q0, p0)
-    #     u = tf.random.uniform([], 0, tf.exp(-H))
-    #     nuts = NoUTurnSampling(num_samples=200, q0=q0, dt=0.05, lhnn=self.lhnn)
-    #     q_minus, p_minus, q_plus, p_plus, C_prime, s_prime = (
-    #         nuts.buildtree(q0, p0, u, 1, 0)
-    #     )
-    #     C = tf.concat([c[0] for c in C_prime], axis=0)
-    #     print(len(C))
-    #     plt.plot(C.numpy().flatten())
-    #     plt.show()
-    #     print(f"q_minus: {q_minus}")
-    #     print(f"p_minus: {p_minus}")

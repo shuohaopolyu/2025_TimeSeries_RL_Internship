@@ -43,6 +43,8 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
         learning_rate=0.001,
         train_set=None,
         test_set=None,
+        save_dir=None,
+        print_every=100,
     ):
         optimizer = tf.keras.optimizers.Adam(learning_rate)
         train_hist = []
@@ -57,7 +59,7 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
                 trainable_vars = self.trainable_variables
                 gradients = tape.gradient(train_loss, trainable_vars)
                 optimizer.apply_gradients(zip(gradients, trainable_vars))
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % print_every == 0:
                 q, p, dqdt, dpdt = tf.split(test_set, 4, axis=-1)
                 test_loss = self.loss_fcn(q, p, dqdt, dpdt)
                 print(
@@ -65,6 +67,8 @@ class HamiltonianNeuralNetwork(tf.keras.Model):
                 )
                 train_hist.append(train_loss.numpy())
                 test_hist.append(test_loss.numpy())
+                if save_dir:
+                    self.save_weights(save_dir)
         train_hist = tf.constant(train_hist)
         test_hist = tf.constant(test_hist)
         print("Training complete!")
