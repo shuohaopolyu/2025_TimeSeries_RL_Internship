@@ -26,4 +26,4 @@ This repository contains the code and documentation developed in response to the
 ## Technical Specifications
 + Python 3.9 + TensorFlow 2.0 environment.
 + Comprehensive documentation and code comments.
-+ Unit tests for all implementations using `pytest`.
++ Unit tests for all implementations using `unittest`.
