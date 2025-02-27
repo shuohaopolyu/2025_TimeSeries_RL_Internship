@@ -9,14 +9,15 @@ from hamilton_system import HamiltonianSystem
 # plt.plot(q, pdf)
 # plt.show()
 
-# expU = OneDimGaussianMixtureDensity()
-# expK = IndepedentGaussians(tf.constant([0.0]), tf.constant([1.0]))
-# H_system = HamiltonianSystem(expU, expK)
+expU = OneDimGaussianMixtureDensity()
+expK = IndepedentGaussians(tf.constant([0.0]), tf.constant([1.0]))
+H_system = HamiltonianSystem(expU, expK)
 
-# hist = H_system.symplectic_integrate(tf.constant([1.0]), tf.constant([3.0]), 0.05, 400)
-# hist = tf.constant(hist)
+hist = H_system.symplectic_integrate(tf.constant([1.0]), tf.constant([3.0]), 0.05, 400)
+hist = tf.constant(hist)
 
-# plt.plot(hist[:, 0], hist[:, 1])
+plt.plot(hist[:, 0], hist[:, 1])
+plt.savefig('foo.pdf')
 # plt.show()
 
 # expU = ThreeDimRosenbrock()

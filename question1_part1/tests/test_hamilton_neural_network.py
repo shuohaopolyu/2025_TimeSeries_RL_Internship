@@ -19,7 +19,7 @@ class TestTrainTestData(unittest.TestCase):
         leap_frog_per_unit = 20
         num_samples = 2
         train_test_data = TrainTestData(
-            num_samples, expU, expK, T, leap_frog_per_unit, q0, p0
+            num_samples, T, leap_frog_per_unit, q0, p0, expU, expK
         )
         samples = train_test_data()
         self.assertEqual(
@@ -30,7 +30,7 @@ class TestTrainTestData(unittest.TestCase):
 class TestHamiltonianNeuralNetwork(unittest.TestCase):
 
     def test_call(self):
-        hnn_0 = HamiltonianNeuralNetwork(2, 32, None, None)
+        hnn_0 = HamiltonianNeuralNetwork(2, 32)
         hnn_0.build(input_shape=(1, 2))
         q = tf.constant([[1.0]])
         p = tf.constant([[1.0]])
@@ -38,14 +38,14 @@ class TestHamiltonianNeuralNetwork(unittest.TestCase):
         h = hnn_0(inputs)
         self.assertEqual(h.shape, (1, 1))
 
-        hnn_1 = HamiltonianNeuralNetwork(2, 32, None, None)
+        hnn_1 = HamiltonianNeuralNetwork(2, 32)
         hnn_1.build(input_shape=(1, 4))
         q = tf.constant([[1.0, 2.0]])
         p = tf.constant([[1.0, 2.0]])
         h = hnn_1.forward(q, p)
         self.assertEqual(h.shape, (1, 1))
 
-        hnn_2 = HamiltonianNeuralNetwork(2, 32, None, None)
+        hnn_2 = HamiltonianNeuralNetwork(2, 32)
         hnn_2.build(input_shape=(1, 4))
         q = tf.constant([[1.0, 1.2], [1.0, 1.2]])
         p = tf.constant([[1.0, 1.2], [1.0, 1.2]])
@@ -53,7 +53,7 @@ class TestHamiltonianNeuralNetwork(unittest.TestCase):
         self.assertEqual(h.shape, (2, 1))
 
     def test_loss(self):
-        hnn_0 = HamiltonianNeuralNetwork(2, 32, None, None)
+        hnn_0 = HamiltonianNeuralNetwork(2, 32)
         q = tf.constant([[1.0]])
         p = tf.constant([[1.0]])
         dqdt = tf.constant([[1.0]])
@@ -70,21 +70,21 @@ class TestHamiltonianNeuralNetwork(unittest.TestCase):
         leap_frog_per_unit = 20
         num_samples = 2
         train_test_data = TrainTestData(
-            num_samples, expU, expK, T, leap_frog_per_unit, q0, p0
+            num_samples, T, leap_frog_per_unit, q0, p0, expU, expK
         )
         samples = train_test_data()
         train_set = samples[:60, :]
         test_set = samples[60:, :]
-        hnn = HamiltonianNeuralNetwork(2, 32, train_set, test_set)
+        hnn = HamiltonianNeuralNetwork(2, 32)
         hnn.build(input_shape=(1, 2))
         hnn.summary()
-        hnn.train(epochs=200, batch_size=10)
+        hnn.train(epochs=200, batch_size=10, learning_rate=1e-3, train_set=train_set, test_set=test_set)
 
 
 class TestLatentHamiltonianNeuralNetwork(unittest.TestCase):
 
     def test_call(self):
-        lhnn_0 = LatentHamiltonianNeuralNetwork(2, 32, 4, None, None)
+        lhnn_0 = LatentHamiltonianNeuralNetwork(2, 32, 4)
         lhnn_0.build(input_shape=(1, 2))
         q = tf.constant([[1.0]])
         p = tf.constant([[1.0]])
@@ -92,7 +92,7 @@ class TestLatentHamiltonianNeuralNetwork(unittest.TestCase):
         z = lhnn_0(inputs)
         self.assertEqual(z.shape, (1, 4))
 
-        lhnn_1 = LatentHamiltonianNeuralNetwork(2, 32, 4, None, None)
+        lhnn_1 = LatentHamiltonianNeuralNetwork(2, 32, 4)
         lhnn_1.build(input_shape=(1, 4))
         q = tf.constant([[1.0, 2.0]])
         p = tf.constant([[1.0, 2.0]])
@@ -100,7 +100,7 @@ class TestLatentHamiltonianNeuralNetwork(unittest.TestCase):
         z = lhnn_1(inputs)
         self.assertEqual(z.shape, (1, 4))
 
-        lhnn_2 = LatentHamiltonianNeuralNetwork(2, 32, 4, None, None)
+        lhnn_2 = LatentHamiltonianNeuralNetwork(2, 32, 4)
         lhnn_2.build(input_shape=(1, 4))
         q = tf.constant([[1.0, 1.2], [1.0, 1.2]])
         p = tf.constant([[1.0, 1.2], [1.0, 1.2]])
@@ -109,7 +109,7 @@ class TestLatentHamiltonianNeuralNetwork(unittest.TestCase):
         self.assertEqual(z.shape, (2, 4))
 
     def test_loss(self):
-        lhnn_0 = LatentHamiltonianNeuralNetwork(2, 32, 4, None, None)
+        lhnn_0 = LatentHamiltonianNeuralNetwork(2, 32, 4)
         lhnn_0.build(input_shape=(1, 4))
         q = tf.constant([[1.0, 2.0]])
         p = tf.constant([[1.0, 2.0]])
@@ -127,12 +127,12 @@ class TestLatentHamiltonianNeuralNetwork(unittest.TestCase):
         leap_frog_per_unit = 20
         num_samples = 4
         train_test_data = TrainTestData(
-            num_samples, expU, expK, T, leap_frog_per_unit, q0, p0
+            num_samples, T, leap_frog_per_unit, q0, p0, expU, expK
         )
         samples = train_test_data()
         train_set = samples[:30, :]
         test_set = samples[30:, :]
-        lhnn = LatentHamiltonianNeuralNetwork(2, 32, 4, train_set, test_set)
+        lhnn = LatentHamiltonianNeuralNetwork(2, 32, 4)
         lhnn.build(input_shape=(1, 2))
         lhnn.summary()
-        lhnn.train(epochs=300, batch_size=10)
+        lhnn.train(epochs=300, batch_size=10, learning_rate=1e-3, train_set=train_set, test_set=test_set)

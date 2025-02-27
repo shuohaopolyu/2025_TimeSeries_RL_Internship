@@ -31,22 +31,22 @@ from hamilton_system import HamiltonianSystem
 # plt.plot(hist.numpy().flatten())
 # plt.show()
 
-U = NegLogThreeDimRosenbrock()
-K = NegLogIndepedentGaussians(tf.constant([0.0, 0.0, 0.0]), tf.constant([1.0, 1.0, 1.0]))
-q0 = tf.constant([[0.0, 2.0, 10.0]])
-p0 = tf.constant([[0.0, 0.0, 0.0]])
-T = 40.0
-leap_frog_per_unit = 40
-num_samples =1
-num_train = int(0.9 * num_samples * leap_frog_per_unit * T)
-H_sys = HamiltonianSystem(U=U, K=K)
-print(H_sys.H(q0, p0))
+# U = NegLogThreeDimRosenbrock()
+# K = NegLogIndepedentGaussians(tf.constant([0.0, 0.0, 0.0]), tf.constant([1.0, 1.0, 1.0]))
+# q0 = tf.constant([[0.0, 2.0, 10.0]])
+# p0 = tf.constant([[0.0, 0.0, 0.0]])
+# T = 40.0
+# leap_frog_per_unit = 40
+# num_samples =1
+# num_train = int(0.9 * num_samples * leap_frog_per_unit * T)
+# H_sys = HamiltonianSystem(U=U, K=K)
+# print(H_sys.H(q0, p0))
 
 # file = tf.io.read_file("./exps/demo2_train_test_data.txt")
 # train_test_data = tf.io.parse_tensor(file, out_type=tf.float32)
 # print(train_test_data.shape)
-hist = H_sys.symplectic_integrate(q0, p0, 0.025, 1000)
-plt.plot(hist[:, 0])
-plt.plot(hist[:, 1])
-plt.plot(hist[:, 2])
-plt.show()
+# hist = H_sys.symplectic_integrate(q0, p0, 0.025, 1000)
+# plt.plot(hist[:, 0])
+# plt.plot(hist[:, 1])
+# plt.plot(hist[:, 2])
+# plt.show()

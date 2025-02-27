@@ -20,6 +20,8 @@ class OneDimGaussianMixtureDensity(PDFModel):
 
     def f(self, q: tf.Tensor):
         assert q.shape[-1] == 1, "the last dimension of q must be 1"
+        if len(q.shape) == 1:
+            q = q[tf.newaxis, :]
         return tf.reduce_sum(
             0.5 * tf.exp(-((q - self.mu_1) ** 2) / (2 * self.sigma_1**2))
             + 0.5 * tf.exp(-((q - self.mu_2) ** 2) / (2 * self.sigma_2**2)),
@@ -41,6 +43,8 @@ class IndepedentGaussians(PDFModel):
 
     def f(self, q: tf.Tensor):
         assert q.shape[-1] == self.mus.shape[0], "q must have the same dimension as mus"
+        if len(q.shape) == 1:
+            q = q[tf.newaxis, :]
         return tf.reduce_prod(
             tf.exp(-0.5 * (q - self.mus) ** 2 / self.sigmas**2)
             / tf.sqrt(2 * np.pi * self.sigmas**2),
