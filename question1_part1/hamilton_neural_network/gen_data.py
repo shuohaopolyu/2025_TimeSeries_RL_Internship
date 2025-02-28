@@ -19,8 +19,14 @@ class TrainTestData:
         self.num_samples = num_samples
         self.dt = 1.0 / leap_frog_per_unit
         self.n_steps = int(T / self.dt)
-        self.q0_for_first_sample = q0_for_first_sample
-        self.p0_for_first_sample = p0_for_first_sample
+        if len(q0_for_first_sample.shape) == 1:
+            self.q0_for_first_sample = q0_for_first_sample[tf.newaxis, :]
+            self.p0_for_first_sample = p0_for_first_sample[tf.newaxis, :]
+        elif len(q0_for_first_sample.shape) == 2:
+            self.q0_for_first_sample = q0_for_first_sample
+            self.p0_for_first_sample = p0_for_first_sample
+        else:
+            raise ValueError("q0_for_first_sample should be 1D or 2D tensor.")
         self.H_system = HamiltonianSystem(expU, expK, U, K, mass)
         self.n_dof = self.q0_for_first_sample.shape[-1]
         if expK is not None:
@@ -45,3 +51,4 @@ class TrainTestData:
             p = tf.random.normal((self.n_dof,))
         print("Finished generating samples.")
         return tf.concat(samples, axis=0)
+

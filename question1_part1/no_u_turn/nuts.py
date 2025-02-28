@@ -22,6 +22,7 @@ class NoUTurnSampling:
         Delta_lf: float,
         Delta_lhnn: float,
         num_lf_steps: int,
+        j_max: int=12,
     ):
         self.num_samples = num_samples
         self.dt = dt
@@ -34,6 +35,9 @@ class NoUTurnSampling:
         self.Delta_lf = Delta_lf
         self.Delta_lhnn = Delta_lhnn
         self.num_lf_steps = num_lf_steps
+        self.j_max = j_max
+        self.lhnn_call = 0
+        self.Hamiltonian_gradient_call = 0
 
     def __call__(self, print_every:int=1) -> tf.Tensor:
         indicator_lf = 0
@@ -98,12 +102,17 @@ class NoUTurnSampling:
                     )
                 )
                 j += 1
+                if j > self.j_max:
+                    break
+            if j > self.j_max:
+                print(f"Warning: Maximum depth reached at sample {i}.")
             self.q_hist.append(q_star)
         return tf.concat(self.q_hist, axis=0)
 
     def buildtree(self, q, p, u, v, j, indicator_lf) -> tuple:
         if j == 0:
             q_prime, p_prime = self.hnn_leapfrog(q, p, tf.cast(v, tf.float32))
+            self.lhnn_call += 2
             H = self.Hamiltonian.H(q_prime, p_prime)
             if (H + tf.math.log(u) - self.Delta_lhnn > 0) or (indicator_lf == 1):
                 indicator_lf = 1
@@ -113,6 +122,7 @@ class NoUTurnSampling:
 
             if indicator_lf == 1:
                 q_prime, p_prime = self.leapfrog(q, p, tf.cast(v, tf.float32))
+                self.Hamiltonian_gradient_call += 2
                 s_prime = tf.cast(H + tf.math.log(u) - self.Delta_lf <= 0, tf.float32)
 
             n_prime = tf.cast(u - tf.exp(-H) <= 0, tf.float32)
@@ -169,13 +179,14 @@ class NoUTurnSampling:
                 if tf.random.uniform((1,), 0, 1) < n_dbl_prime / (n_prime + n_dbl_prime):
                     q_prime = q_dbl_prime
                 n_prime = n_prime + n_dbl_prime
+                position_moved = (q_plus - q_minus)
                 s_prime = (
                     s_dbl_prime
                     * tf.cast(
-                        tf.reduce_sum((q_plus - q_minus) * p_minus) >= 0, tf.float32
+                        tf.reduce_sum(position_moved * p_minus) >= 0, tf.float32
                     )
                     * tf.cast(
-                        tf.reduce_sum((q_plus - q_minus) * p_plus) >= 0, tf.float32
+                        tf.reduce_sum(position_moved * p_plus) >= 0, tf.float32
                     )
                 )
             return (
