@@ -43,6 +43,7 @@ class NoUTurnSampling:
         indicator_lf = 0
         n_lf = 0
         for i in range(self.num_samples):
+            # print(indicator_lf)
             if i % print_every == 0:
                 print(f"Sample {i} of {self.num_samples}")
             q_0 = self.q_hist[-1]
@@ -69,7 +70,7 @@ class NoUTurnSampling:
                         _,
                         _,
                         q_prime,
-                        p_prime,
+                        _,
                         n_prime,
                         s_prime,
                         indicator_lf,
@@ -81,7 +82,7 @@ class NoUTurnSampling:
                         q_plus,
                         p_plus,
                         q_prime,
-                        p_prime,
+                        _,
                         n_prime,
                         s_prime,
                         indicator_lf,
@@ -112,9 +113,10 @@ class NoUTurnSampling:
     def buildtree(self, q, p, u, v, j, indicator_lf) -> tuple:
         if j == 0:
             q_prime, p_prime = self.hnn_leapfrog(q, p, tf.cast(v, tf.float32))
-            self.lhnn_call += 2
+            self.lhnn_call += 1
             H = self.Hamiltonian.H(q_prime, p_prime)
-            if (H + tf.math.log(u) - self.Delta_lhnn > 0) or (indicator_lf == 1):
+            monitor = H + tf.math.log(u)
+            if (monitor - self.Delta_lhnn > 0) or indicator_lf:
                 indicator_lf = 1
             else:
                 indicator_lf = 0
@@ -122,7 +124,7 @@ class NoUTurnSampling:
 
             if indicator_lf == 1:
                 q_prime, p_prime = self.leapfrog(q, p, tf.cast(v, tf.float32))
-                self.Hamiltonian_gradient_call += 2
+                self.Hamiltonian_gradient_call += 1
                 s_prime = tf.cast(H + tf.math.log(u) - self.Delta_lf <= 0, tf.float32)
 
             n_prime = tf.cast(u - tf.exp(-H) <= 0, tf.float32)

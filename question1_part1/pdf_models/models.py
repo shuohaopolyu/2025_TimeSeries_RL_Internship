@@ -77,9 +77,10 @@ class NegLogThreeDimRosenbrock(PDFModel):
             (100 * (q[:, 1] - q[:, 0] ** 2) ** 2 + (1 - q[:, 0]) ** 2)
             + (100 * (q[:, 2] - q[:, 1] ** 2) ** 2 + (1 - q[:, 1]) ** 2)
         ) / 20.0
-        
+
+
 class NegLogIndepedentGaussians(PDFModel):
-    
+
     def __init__(self, mus: tf.Tensor, sigmas: tf.Tensor):
         self.mus = mus
         self.sigmas = sigmas
@@ -96,16 +97,16 @@ class NegLogIndepedentGaussians(PDFModel):
             0.5 * (q - self.mus) ** 2 / self.sigmas**2,
             axis=-1,
         )
-    
+
+
 class NegLogNealFunnel(PDFModel):
-    
+
     def f(self, q: tf.Tensor):
         assert q.shape[-1] == 2, "q must have dimension 2"
         if len(q.shape) == 1:
             q = q[tf.newaxis, :]
-        return (
-            0.5 * q[:, 0] ** 2 / 3 ** 2 + 0.5 * q[:, 1] ** 2 / tf.exp(q[:, 0]) ** 2
-        )
+        return 0.5 * q[:, 0] ** 2 / 3**2 + 0.5 * q[:, 1] ** 2 / tf.exp(q[:, 0] / 2) ** 2
+
 
 class NegLogTenDimRosenbrock(PDFModel):
 
@@ -115,6 +116,5 @@ class NegLogTenDimRosenbrock(PDFModel):
             q = q[tf.newaxis, :]
         val = 0.0
         for i in range(8):
-            val += (100 * (q[:, i + 1] - q[:, i] ** 2) ** 2 + (1 - q[:, i]) ** 2)
+            val += 100 * (q[:, i + 1] - q[:, i] ** 2) ** 2 + (1 - q[:, i]) ** 2
         return val / 20.0
-
