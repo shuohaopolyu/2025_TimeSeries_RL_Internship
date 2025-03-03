@@ -4,7 +4,6 @@ from no_u_turn.nuts import NoUTurnSampling
 from hamilton_neural_network import LatentHamiltonianNeuralNetwork
 from pdf_models import IndepedentGaussians, OneDimGaussianMixtureDensity
 from hamilton_system import HamiltonianSystem
-import matplotlib.pyplot as plt
 
 
 class TestNoUTurnSampling(unittest.TestCase):

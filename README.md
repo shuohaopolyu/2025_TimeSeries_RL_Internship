@@ -16,14 +16,16 @@ This repository contains the code and documentation developed in response to the
    + A report responding to points a-f of Part 2, see [Report_BIOCD](question3_part2/report_biocd.pdf).
    + Tests for the implementation, see [tests](question3_part2/tests) folder.
 
-3. **question1_part1** (To be completed by 3 March 2025)
+3. **question1_part1** (Completed on 3 March 2025)
    + Code and implementation for Efficient Bayesian Inference with Latent Hamiltonian Neural Networks in No-U-Turn Sampling by Dhulipala et al. (2023).
+   + Demonstrations of the implementation, see [Demo 1. Gaussian Mixture Denxity](question1_part1/demo/demo1_gaussian_mixture_density_1d.ipynb), [Demo 2. 3-D Rosenbrock](question1_part1/demo/demo2_rosenbrock_density_3d.ipynb), [Demo 3. 2-D Neal’s Funnel](question1_part1/demo/demo3_neal_funnel_density_2d.ipynb), [Demo 4. 5-D ill-conditioned Gaussian](question1_part1/demo/demo4_ill_conditioned_gaussian_5d.ipynb), and [Demo 5.  10-D degenerate Rosenbrock](question1_part1/demo/demo5_rosenbrock_density_10d.ipynb).
+   + A report for Part 1, see [Report_LHNN_NUTS](question1_part1/report_lhnn_nuts.pdf).
+   + Tests for the implementation, see [tests](question1_part1/tests) folder.
 
 4. **reports**
-   + A consolidated resport of all findings.
-   + Individual answers for each part.
+   + Individual reports for each part.
 
 ## Technical Specifications
-+ Python 3.9 + TensorFlow 2.0 environment.
++ Python 3.8 + TensorFlow 2.0 environment.
 + Comprehensive documentation and code comments.
 + Unit tests for all implementations using `unittest`.
